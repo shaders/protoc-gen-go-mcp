@@ -65,7 +65,7 @@ import (
   "google.golang.org/protobuf/encoding/protojson"
   "connectrpc.com/connect"
   grpc "google.golang.org/grpc"
-  "github.com/redpanda-data/protoc-gen-go-mcp/pkg/runtime"
+  "github.com/shaders/protoc-gen-go-mcp/pkg/runtime"
   "google.golang.org/protobuf/proto"
   "google.golang.org/protobuf/reflect/protoreflect"
 )

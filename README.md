@@ -1,7 +1,7 @@
 # `protoc-gen-go-mcp`
 
-[![Test](https://github.com/redpanda-data/protoc-gen-go-mcp/actions/workflows/test.yml/badge.svg)](https://github.com/redpanda-data/protoc-gen-go-mcp/actions/workflows/test.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/redpanda-data/protoc-gen-go-mcp)](https://goreportcard.com/report/github.com/redpanda-data/protoc-gen-go-mcp)
+[![Test](https://github.com/shaders/protoc-gen-go-mcp/actions/workflows/test.yml/badge.svg)](https://github.com/shaders/protoc-gen-go-mcp/actions/workflows/test.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/shaders/protoc-gen-go-mcp)](https://goreportcard.com/report/github.com/shaders/protoc-gen-go-mcp)
 [![codecov](https://codecov.io/gh/redpanda-data/protoc-gen-go-mcp/branch/main/graph/badge.svg)](https://codecov.io/gh/redpanda-data/protoc-gen-go-mcp)
 
 **`protoc-gen-go-mcp`** is a [Protocol Buffers](https://protobuf.dev) compiler plugin that generates [Model Context Protocol (MCP)](https://modelcontextprotocol.io) servers for your `gRPC` or `ConnectRPC` APIs.
@@ -29,7 +29,7 @@ plugins:
   - local:
       - go
       - run
-      - github.com/redpanda-data/protoc-gen-go-mcp/cmd/protoc-gen-go-mcp@latest
+      - github.com/shaders/protoc-gen-go-mcp/cmd/protoc-gen-go-mcp@latest
     out: ./gen/go
     opt: paths=source_relative
 ```
