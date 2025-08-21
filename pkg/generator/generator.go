@@ -58,6 +58,7 @@ package {{ .GoPackage }}
 
 import (
   "context"
+  "strings"
   "github.com/mark3labs/mcp-go/mcp"
   mcpserver "github.com/mark3labs/mcp-go/server"
   "encoding/json"
@@ -65,6 +66,8 @@ import (
   "connectrpc.com/connect"
   grpc "google.golang.org/grpc"
   "github.com/redpanda-data/protoc-gen-go-mcp/pkg/runtime"
+  "google.golang.org/protobuf/proto"
+  "google.golang.org/protobuf/reflect/protoreflect"
 )
 
 
@@ -221,6 +224,78 @@ type Connect{{$serviceName}}Client interface {
 }
 {{ end }}
 
+// TODO: BUG: https://github.com/anthropics/claude-code/issues/3084
+// NormalizeTopLevelJSONStringsForOneofs scans m's top level and, for keys that are members
+// of any (or selected) oneof(s) in the given proto message type, it will parse string values
+// that look like JSON and replace them with the parsed value.
+// If oneofNames is empty, all oneofs are considered. Otherwise only the named oneofs are used.
+func NormalizeTopLevelJSONStringsForOneofs(
+	m map[string]interface{},
+	msg proto.Message,
+	oneofNames ...string,
+) (changed bool) {
+	if m == nil || msg == nil {
+		return false
+	}
+
+	md := msg.ProtoReflect().Descriptor()
+	// Build a set of target oneof descriptors
+	var targetOneofs map[protoreflect.OneofDescriptor]struct{}
+	if len(oneofNames) > 0 {
+		targetOneofs = map[protoreflect.OneofDescriptor]struct{}{}
+	outer:
+		for i := 0; i < md.Oneofs().Len(); i++ {
+			od := md.Oneofs().Get(i)
+			for _, name := range oneofNames {
+				if string(od.Name()) == name {
+					targetOneofs[od] = struct{}{}
+					continue outer
+				}
+			}
+		}
+	}
+
+	// Collect JSON names of fields that belong to the target oneof(s)
+	jsonNames := map[string]struct{}{}
+	for i := 0; i < md.Fields().Len(); i++ {
+		fd := md.Fields().Get(i)
+		if fd.ContainingOneof() == nil {
+			continue
+		}
+		if targetOneofs != nil {
+			if _, ok := targetOneofs[fd.ContainingOneof()]; !ok {
+				continue
+			}
+		}
+		// fd.JSONName() is the canonical JSON field name ("cat", "dog", ...)
+		jsonNames[fd.JSONName()] = struct{}{}
+		// Also consider the proto field name in case your map uses snake_case
+		jsonNames[string(fd.Name())] = struct{}{}
+	}
+
+	// Rewrite top-level stringified JSON for those keys
+	for k, v := range m {
+		if _, ok := jsonNames[k]; !ok {
+			continue
+		}
+		s, ok := v.(string)
+		if !ok {
+			continue
+		}
+		trim := strings.TrimSpace(s)
+		if trim == "" || !(strings.HasPrefix(trim, "{") || strings.HasPrefix(trim, "[")) {
+			continue
+		}
+		var parsed any
+		if err := json.Unmarshal([]byte(trim), &parsed); err != nil {
+			continue // ignore if it's not valid JSON
+		}
+		m[k] = parsed
+		changed = true
+	}
+	return changed
+}
+
 {{- range $key, $val := .Services }}
 // ForwardToConnect{{$key}}Client registers a connectrpc client, to forward MCP calls to it.
 func ForwardToConnect{{$key}}Client(s *mcpserver.MCPServer, client Connect{{$key}}Client, opts ...runtime.Option) {
@@ -291,6 +366,9 @@ func ForwardTo{{$key}}Client(s *mcpserver.MCPServer, client {{$key}}Client, opts
     var req {{$tool_val.RequestType}}
 
     message := request.GetArguments()
+
+    // Limit to the "kind" oneof (optional). If you omit it, all oneofs are considered.
+    _ = NormalizeTopLevelJSONStringsForOneofs(message, &req, "kind")
 
     // Extract extra properties if configured
     for _, prop := range config.ExtraProperties {
