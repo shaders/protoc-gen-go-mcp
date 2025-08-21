@@ -24,6 +24,8 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"google.golang.org/genproto/googleapis/api/annotations"
@@ -98,7 +100,7 @@ func Register{{$key}}Handler(s *mcpserver.MCPServer, srv {{$key}}Server, opts ..
   }
 
   {{- range $tool_name, $tool_val := $val }}
-  {{$tool_name}}Tool := {{$key}}_{{$tool_name}}Tool
+  {{$tool_name}}Tool := {{$key | capitalizeFirst}}_{{$tool_name}}Tool
   // Add extra properties to schema if configured
   if len(config.ExtraProperties) > 0 {
     {{$tool_name}}Tool = runtime.AddExtraPropertiesToTool({{$tool_name}}Tool, config.ExtraProperties)
@@ -148,7 +150,7 @@ func Register{{$key}}HandlerOpenAI(s *mcpserver.MCPServer, srv {{$key}}Server, o
   }
 
   {{- range $tool_name, $tool_val := $val }}
-  {{$tool_name}}ToolOpenAI := {{$key}}_{{$tool_name}}ToolOpenAI
+  {{$tool_name}}ToolOpenAI := {{$key | capitalizeFirst}}_{{$tool_name}}ToolOpenAI
   // Add extra properties to schema if configured
   if len(config.ExtraProperties) > 0 {
     {{$tool_name}}ToolOpenAI = runtime.AddExtraPropertiesToTool({{$tool_name}}ToolOpenAI, config.ExtraProperties)
@@ -224,12 +226,13 @@ type Connect{{$serviceName}}Client interface {
 }
 {{ end }}
 
+{{- range $serviceName, $methods := .Services }}
 // TODO: BUG: https://github.com/anthropics/claude-code/issues/3084
-// NormalizeTopLevelJSONStringsForOneofs scans m's top level and, for keys that are members
+// {{$serviceName}}NormalizeTopLevelJSONStringsForOneofs scans m's top level and, for keys that are members
 // of any (or selected) oneof(s) in the given proto message type, it will parse string values
 // that look like JSON and replace them with the parsed value.
 // If oneofNames is empty, all oneofs are considered. Otherwise only the named oneofs are used.
-func NormalizeTopLevelJSONStringsForOneofs(
+func {{$serviceName}}NormalizeTopLevelJSONStringsForOneofs(
 	m map[string]interface{},
 	msg proto.Message,
 	oneofNames ...string,
@@ -295,6 +298,7 @@ func NormalizeTopLevelJSONStringsForOneofs(
 	}
 	return changed
 }
+{{- end }}
 
 {{- range $key, $val := .Services }}
 // ForwardToConnect{{$key}}Client registers a connectrpc client, to forward MCP calls to it.
@@ -305,7 +309,7 @@ func ForwardToConnect{{$key}}Client(s *mcpserver.MCPServer, client Connect{{$key
   }
 
   {{- range $tool_name, $tool_val := $val }}
-  {{$tool_name}}Tool := {{$key}}_{{$tool_name}}Tool
+  {{$tool_name}}Tool := {{$key | capitalizeFirst}}_{{$tool_name}}Tool
   // Add extra properties to schema if configured
   if len(config.ExtraProperties) > 0 {
     {{$tool_name}}Tool = runtime.AddExtraPropertiesToTool({{$tool_name}}Tool, config.ExtraProperties)
@@ -356,7 +360,7 @@ func ForwardTo{{$key}}Client(s *mcpserver.MCPServer, client {{$key}}Client, opts
   }
 
   {{- range $tool_name, $tool_val := $val }}
-  {{$tool_name}}Tool := {{$key}}_{{$tool_name}}Tool
+  {{$tool_name}}Tool := {{$key | capitalizeFirst}}_{{$tool_name}}Tool
   // Add extra properties to schema if configured
   if len(config.ExtraProperties) > 0 {
     {{$tool_name}}Tool = runtime.AddExtraPropertiesToTool({{$tool_name}}Tool, config.ExtraProperties)
@@ -368,7 +372,7 @@ func ForwardTo{{$key}}Client(s *mcpserver.MCPServer, client {{$key}}Client, opts
     message := request.GetArguments()
 
     // Limit to the "kind" oneof (optional). If you omit it, all oneofs are considered.
-    _ = NormalizeTopLevelJSONStringsForOneofs(message, &req, "kind")
+    _ = {{$key}}NormalizeTopLevelJSONStringsForOneofs(message, &req, "kind")
 
     // Extract extra properties if configured
     for _, prop := range config.ExtraProperties {
@@ -748,6 +752,28 @@ func MangleHeadIfTooLong(name string, maxLen int) string {
 	return hashPrefix + "_" + tail
 }
 
+func capitalizeFirstLetter(s string) string {
+	i := 0
+	for i < len(s) {
+		r, size := utf8.DecodeRuneInString(s[i:])
+		if !unicode.IsLetter(r) {
+			i += size
+			continue
+		}
+		ur := unicode.ToUpper(r)
+		if ur == r {
+			return s
+		}
+		var b strings.Builder
+		b.Grow(len(s))
+		b.WriteString(s[:i])
+		b.WriteRune(ur)
+		b.WriteString(s[i+size:])
+		return b.String()
+	}
+	return s
+}
+
 func (g *FileGenerator) Generate(packageSuffix string) {
 	file := g.f
 	if len(g.f.Services) == 0 {
@@ -780,8 +806,12 @@ func (g *FileGenerator) Generate(packageSuffix string) {
 		g.gf.Import(file.GoImportPath)
 	}
 
+	funcMap := template.FuncMap{
+		"capitalizeFirst": capitalizeFirstLetter,
+	}
+
 	fileTpl := fileTemplate
-	tpl, err := template.New("gen").Parse(fileTpl)
+	tpl, err := template.New("gen").Funcs(funcMap).Parse(fileTpl)
 	if err != nil {
 		g.gen.Error(err)
 		return
@@ -837,6 +867,7 @@ func (g *FileGenerator) Generate(packageSuffix string) {
 				MCPTool:       toolStandard,
 				MCPToolOpenAI: toolOpenAI,
 			}
+
 			tools[svc.GoName+"_"+meth.GoName] = toolStandard
 			toolsOpenAI[svc.GoName+"_"+meth.GoName] = toolOpenAI
 		}
