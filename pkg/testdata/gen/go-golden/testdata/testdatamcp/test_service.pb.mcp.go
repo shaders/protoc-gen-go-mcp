@@ -112,6 +112,45 @@ func TestServiceNormalizeTopLevelJSONStringsForOneofs(
 	return changed
 }
 
+// TestServiceTransformOneOfFields transforms discriminated union fields back to protobuf oneOf format
+func TestServiceTransformOneOfFields(m map[string]interface{}) {
+	TestServiceTransformOneOfFieldsRecursive(m)
+}
+
+// TestServiceTransformOneOfFieldsRecursive recursively transforms oneOf fields in nested objects
+func TestServiceTransformOneOfFieldsRecursive(obj interface{}) {
+	switch v := obj.(type) {
+	case map[string]interface{}:
+		// Transform oneOf fields in this object
+		for key, value := range v {
+			// Check if this looks like a oneOf discriminated union
+			if unionObj, ok := value.(map[string]interface{}); ok {
+				if typeField, hasType := unionObj["type"]; hasType {
+					if typeStr, ok := typeField.(string); ok {
+						// This is a discriminated union, transform it
+						// Remove the "type" field and move other properties up
+						delete(unionObj, "type")
+
+						// Replace the union object with the variant object
+						v[typeStr] = unionObj
+						delete(v, key)
+					}
+				}
+			}
+		}
+
+		// Recursively process all values
+		for _, value := range v {
+			TestServiceTransformOneOfFieldsRecursive(value)
+		}
+	case []interface{}:
+		// Process array elements
+		for _, item := range v {
+			TestServiceTransformOneOfFieldsRecursive(item)
+		}
+	}
+}
+
 // ForwardToTestServiceClient registers a gRPC client, to forward MCP calls to it.
 func ForwardToTestServiceClient(s *mcpserver.MCPServer, client TestServiceClient, opts ...runtime.Option) {
 	config := runtime.NewConfig()
@@ -137,8 +176,12 @@ func ForwardToTestServiceClient(s *mcpserver.MCPServer, client TestServiceClient
 
 		message := request.GetArguments()
 
+		// Transform oneOf discriminated unions back to protobuf format
+		TestServiceTransformOneOfFields(message)
+
 		// Limit to the "kind" oneof (optional). If you omit it, all oneofs are considered.
-		_ = TestServiceNormalizeTopLevelJSONStringsForOneofs(message, &req, "kind")
+		// TODO: checking that the bug was fixed
+		// _ = TestServiceNormalizeTopLevelJSONStringsForOneofs(message, &req, "")
 
 		// Extract extra properties if configured
 		for _, prop := range config.ExtraProperties {
@@ -186,8 +229,12 @@ func ForwardToTestServiceClient(s *mcpserver.MCPServer, client TestServiceClient
 
 		message := request.GetArguments()
 
+		// Transform oneOf discriminated unions back to protobuf format
+		TestServiceTransformOneOfFields(message)
+
 		// Limit to the "kind" oneof (optional). If you omit it, all oneofs are considered.
-		_ = TestServiceNormalizeTopLevelJSONStringsForOneofs(message, &req, "kind")
+		// TODO: checking that the bug was fixed
+		// _ = TestServiceNormalizeTopLevelJSONStringsForOneofs(message, &req, "")
 
 		// Extract extra properties if configured
 		for _, prop := range config.ExtraProperties {
@@ -235,8 +282,12 @@ func ForwardToTestServiceClient(s *mcpserver.MCPServer, client TestServiceClient
 
 		message := request.GetArguments()
 
+		// Transform oneOf discriminated unions back to protobuf format
+		TestServiceTransformOneOfFields(message)
+
 		// Limit to the "kind" oneof (optional). If you omit it, all oneofs are considered.
-		_ = TestServiceNormalizeTopLevelJSONStringsForOneofs(message, &req, "kind")
+		// TODO: checking that the bug was fixed
+		// _ = TestServiceNormalizeTopLevelJSONStringsForOneofs(message, &req, "")
 
 		// Extract extra properties if configured
 		for _, prop := range config.ExtraProperties {

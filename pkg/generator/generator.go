@@ -241,6 +241,45 @@ func {{$serviceName}}NormalizeTopLevelJSONStringsForOneofs(
 	}
 	return changed
 }
+
+// {{$serviceName}}TransformOneOfFields transforms discriminated union fields back to protobuf oneOf format
+func {{$serviceName}}TransformOneOfFields(m map[string]interface{}) {
+	{{$serviceName}}TransformOneOfFieldsRecursive(m)
+}
+
+// {{$serviceName}}TransformOneOfFieldsRecursive recursively transforms oneOf fields in nested objects
+func {{$serviceName}}TransformOneOfFieldsRecursive(obj interface{}) {
+	switch v := obj.(type) {
+	case map[string]interface{}:
+		// Transform oneOf fields in this object
+		for key, value := range v {
+			// Check if this looks like a oneOf discriminated union
+			if unionObj, ok := value.(map[string]interface{}); ok {
+				if typeField, hasType := unionObj["type"]; hasType {
+					if typeStr, ok := typeField.(string); ok {
+						// This is a discriminated union, transform it
+						// Remove the "type" field and move other properties up
+						delete(unionObj, "type")
+
+						// Replace the union object with the variant object
+						v[typeStr] = unionObj
+						delete(v, key)
+					}
+				}
+			}
+		}
+
+		// Recursively process all values
+		for _, value := range v {
+			{{$serviceName}}TransformOneOfFieldsRecursive(value)
+		}
+	case []interface{}:
+		// Process array elements
+		for _, item := range v {
+			{{$serviceName}}TransformOneOfFieldsRecursive(item)
+		}
+	}
+}
 {{- end }}
 
 
@@ -271,6 +310,9 @@ func ForwardTo{{$key}}Client(s *mcpserver.MCPServer, client {{$key}}Client, opts
     var req {{$tool_val.RequestType}}
 
     message := request.GetArguments()
+
+    // Transform oneOf discriminated unions back to protobuf format
+    {{$key}}TransformOneOfFields(message)
 
     // Limit to the "kind" oneof (optional). If you omit it, all oneofs are considered.
 	// TODO: checking that the bug was fixed
