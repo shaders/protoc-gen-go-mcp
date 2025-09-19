@@ -40,7 +40,7 @@ message CreateItemRequest {
   // Optional field
   optional string description = 2;
   
-  // Map field (becomes array in OpenAI mode)
+  // Map field
   map<string, string> labels = 3;
   
   // Repeated field
@@ -52,17 +52,21 @@ message CreateItemRequest {
     ServiceDetails service = 6;
   }
   
-  // Bytes field (has format: byte that should be removed in OpenAI)
+  // Bytes field
   bytes thumbnail = 7;
 }
 
 message ProductDetails {
+  // Product price in dollars
   double price = 1;
+  // Available quantity
   int32 quantity = 2;
 }
 
 message ServiceDetails {
+  // Service duration (e.g. "1h", "30m")
   string duration = 1;
+  // Whether this is a recurring service
   bool recurring = 2;
 }
 
@@ -89,7 +93,7 @@ message Item {
 }
 
 message ProcessWellKnownTypesRequest {
-  // Well-known types that need special handling in OpenAI mode
+  // Well-known types that need special handling
   google.protobuf.Struct metadata = 1;
   google.protobuf.Value config = 2;
   google.protobuf.Any payload = 3;

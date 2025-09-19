@@ -45,7 +45,7 @@ type CreateItemRequest struct {
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// Optional field
 	Description *string `protobuf:"bytes,2,opt,name=description,proto3,oneof" json:"description,omitempty"`
-	// Map field (becomes array in OpenAI mode)
+	// Map field
 	Labels map[string]string `protobuf:"bytes,3,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Repeated field
 	Tags []string `protobuf:"bytes,4,rep,name=tags,proto3" json:"tags,omitempty"`
@@ -56,7 +56,7 @@ type CreateItemRequest struct {
 	//	*CreateItemRequest_Product
 	//	*CreateItemRequest_Service
 	ItemType isCreateItemRequest_ItemType `protobuf_oneof:"item_type"`
-	// Bytes field (has format: byte that should be removed in OpenAI)
+	// Bytes field
 	Thumbnail     []byte `protobuf:"bytes,7,opt,name=thumbnail,proto3" json:"thumbnail,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -169,9 +169,11 @@ func (*CreateItemRequest_Product) isCreateItemRequest_ItemType() {}
 func (*CreateItemRequest_Service) isCreateItemRequest_ItemType() {}
 
 type ProductDetails struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Price         float64                `protobuf:"fixed64,1,opt,name=price,proto3" json:"price,omitempty"`
-	Quantity      int32                  `protobuf:"varint,2,opt,name=quantity,proto3" json:"quantity,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Product price in dollars
+	Price float64 `protobuf:"fixed64,1,opt,name=price,proto3" json:"price,omitempty"`
+	// Available quantity
+	Quantity      int32 `protobuf:"varint,2,opt,name=quantity,proto3" json:"quantity,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -221,9 +223,11 @@ func (x *ProductDetails) GetQuantity() int32 {
 }
 
 type ServiceDetails struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Duration      string                 `protobuf:"bytes,1,opt,name=duration,proto3" json:"duration,omitempty"`
-	Recurring     bool                   `protobuf:"varint,2,opt,name=recurring,proto3" json:"recurring,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Service duration (e.g. "1h", "30m")
+	Duration string `protobuf:"bytes,1,opt,name=duration,proto3" json:"duration,omitempty"`
+	// Whether this is a recurring service
+	Recurring     bool `protobuf:"varint,2,opt,name=recurring,proto3" json:"recurring,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -498,7 +502,7 @@ func (x *Item) GetUpdatedAt() *timestamppb.Timestamp {
 
 type ProcessWellKnownTypesRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Well-known types that need special handling in OpenAI mode
+	// Well-known types that need special handling
 	Metadata      *structpb.Struct       `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
 	Config        *structpb.Value        `protobuf:"bytes,2,opt,name=config,proto3" json:"config,omitempty"`
 	Payload       *anypb.Any             `protobuf:"bytes,3,opt,name=payload,proto3" json:"payload,omitempty"`
