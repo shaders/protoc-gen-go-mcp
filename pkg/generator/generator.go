@@ -77,67 +77,7 @@ var (
 {{- end }}
 )
 
-{{- range $serviceName, $methods := .Services }}
-// {{$serviceName}}Server is compatible with the grpc-go server interface.
-type {{$serviceName}}Server interface {
-  {{- range $methodName, $tool := $methods }}
-  {{$methodName}}(ctx context.Context, req *{{$tool.RequestType}}) (*{{$tool.ResponseType}}, error)
-  {{- end }}
-}
-{{ end }}
 
-{{- range $key, $val := .Services }}
-// Register{{$key}}Handler registers standard MCP handlers for {{$key}}
-func Register{{$key}}Handler(s *mcpserver.MCPServer, srv {{$key}}Server, opts ...runtime.Option) {
-  config := runtime.NewConfig()
-  for _, opt := range opts {
-    opt(config)
-  }
-
-  {{- range $tool_name, $tool_val := $val }}
-  {{$tool_name}}Tool := {{$key | capitalizeFirst}}_{{$tool_name}}Tool
-  // Add extra properties to schema if configured
-  if len(config.ExtraProperties) > 0 {
-    {{$tool_name}}Tool = runtime.AddExtraPropertiesToTool({{$tool_name}}Tool, config.ExtraProperties)
-  }
-  
-  s.AddTool({{$tool_name}}Tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-    var req {{$tool_val.RequestType}}
-
-    message := request.GetArguments()
-
-    // Extract extra properties if configured
-    for _, prop := range config.ExtraProperties {
-      if propVal, ok := message[prop.Name]; ok {
-        ctx = context.WithValue(ctx, prop.ContextKey, propVal)
-      }
-    }
-
-    marshaled, err := json.Marshal(message)
-    if err != nil {
-      return nil, err
-    }
-
-    if err := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(marshaled, &req); err != nil {
-      return nil, err
-    }
-
-    resp, err := srv.{{$tool_name}}(ctx, &req)
-    if err != nil {
-      return runtime.HandleError(err)
-    }
-
-    marshaled, err = (protojson.MarshalOptions{UseProtoNames: true, EmitDefaultValues: true}).Marshal(resp)
-    if err != nil {
-      return nil, err
-    }
-
-    return mcp.NewToolResultText(string(marshaled)), nil
-  })
-  {{- end }}
-}
-
-{{- end }}
 
 {{- range $serviceName, $methods := .Services }}
 // {{$serviceName}}Client is compatible with the grpc-go client interface.
