@@ -453,7 +453,8 @@ func Base32String(b []byte) string {
 
 func MangleHeadIfTooLong(name string, maxLen int) string {
 	if len(name) <= maxLen {
-		return name
+		// Just sanitize the original name if it's short enough
+		return sanitizeForGemini(name)
 	}
 
 	// Generate short hash of full name
@@ -463,12 +464,92 @@ func MangleHeadIfTooLong(name string, maxLen int) string {
 	// Leave room for hash prefix + underscore
 	available := maxLen - len(hashPrefix) - 1
 	if available <= 0 {
-		return hashPrefix
+		return sanitizeForGemini(hashPrefix)
 	}
 
 	// Preserve the end of the name (most specific)
 	tail := name[len(name)-available:]
-	return hashPrefix + "_" + tail
+	result := hashPrefix + "_" + tail
+
+	// Sanitize the final result once
+	return sanitizeForGemini(result)
+}
+
+// sanitizeForGemini ensures the name complies with Gemini tool name restrictions:
+// - Must start with a letter or underscore
+// - Only alphanumeric, underscores, dots, colons, or dashes allowed
+// - Maximum length of 64 characters
+func sanitizeForGemini(name string) string {
+	if len(name) == 0 {
+		return "tool"
+	}
+
+	var result strings.Builder
+	result.Grow(min(len(name), 64))
+
+	for _, r := range name {
+		switch {
+		case isLetter(r), isDigit(r):
+			result.WriteRune(r)
+		case r == '_' || r == '.' || r == ':' || r == '-':
+			result.WriteRune(r)
+		case r == '/' || r == ' ':
+			// Convert common separators to underscores
+			result.WriteRune('_')
+		default:
+			// Skip invalid characters
+		}
+
+		// Stop at 64 characters
+		if result.Len() >= 64 {
+			break
+		}
+	}
+
+	finalName := result.String()
+
+	// Ensure it starts with letter or underscore
+	if len(finalName) == 0 {
+		return "tool"
+	}
+
+	finalName = ensureValidStart(finalName)
+
+	// Trim to max length
+	if len(finalName) > 64 {
+		finalName = finalName[:64]
+	}
+
+	return finalName
+}
+
+// ensureValidStart ensures the string starts with a letter or underscore as required by Gemini
+func ensureValidStart(s string) string {
+	if len(s) == 0 {
+		return "tool"
+	}
+	if !isLetter(rune(s[0])) && s[0] != '_' {
+		if len(s) == 1 {
+			return "t_" + s
+		}
+		return "t" + s[1:] // Replace first char with 't'
+	}
+	return s
+}
+
+func isLetter(r rune) bool {
+	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
+}
+
+func isDigit(r rune) bool {
+	return r >= '0' && r <= '9'
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func capitalizeFirstLetter(s string) string {
