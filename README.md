@@ -12,10 +12,15 @@ It generates `*.pb.mcp.go` files for each protobuf service, enabling you to dele
 
 ## ✨ Features
 
-- 🚀 Auto-generates MCP handlers from your `.proto` services  
-- 📦 Outputs JSON Schema for method inputs  
-- 🔄 Wire up to gRPC servers/clients  
-- 🧩 Easy integration with [`buf`](https://buf.build)  
+- 🚀 **Auto-generates MCP handlers** from your `.proto` services
+- 🧠 **AI-Friendly Schemas** - Clean, simple JSON schemas that AI models can easily understand
+- 🔀 **Advanced OneOf Support** - Handles protobuf oneOf with discriminated unions and automatic transformation
+- 💬 **Field Comments as Descriptions** - Preserves protobuf comments in tool schemas (including nested messages)
+- 📦 **JSON Schema Generation** for method inputs with proper validation
+- 🔄 **Flexible Integration** - Wire up to gRPC servers or clients
+- 🧩 **Easy [`buf`](https://buf.build) Integration**
+- ⚡  **Well-Known Types** - Proper handling of Google protobuf well-known types
+- 🎯 **Gemini Compliant** - Tool names follow Google's restrictions  
   
 
 ## 🔧 Usage
@@ -50,31 +55,21 @@ gen
             └── test_service.pb.mcp.go
 ```
 
-### Wiring Up MCP with gRPC server (in-process)
+### Advanced OneOf Support
 
-Example for in-process registration:
-
-```go
-srv := testServer{} // your gRPC implementation
-
-// Register all RPC methods as tools on the MCP server
-testdatamcp.RegisterTestServiceHandler(mcpServer, &srv)
-```
-
-Each RPC method in your protobuf service becomes an MCP tool.
-
-
-➡️ See the [full example](./examples/basic) for details.
+`protoc-gen-go-mcp` generates AI-friendly schemas for protobuf oneOf fields using discriminated unions
 
 ### Wiring up with gRPC client
 
-It is also possible to directly forward MCP tool calls to gRPC clients.
+It is also possible to directly forward MCP tool calls to gRPC clients. Follows gRPC-Gateway pattern.
+Connect to gRPC server, then:
 
 ```go
 testdatamcp.ForwardToTestServiceClient(mcpServer, myGrpcClient)
 ```
 
 This directly connects the MCP handler to the gRPC client, requiring zero boilerplate.
+Each RPC method in your protobuf service becomes an MCP tool.
 
 ### Extra properties
 
@@ -93,7 +88,6 @@ option := runtime.WithExtraProperties(
 )
 
 // Use with any generated function
-testdatamcp.RegisterTestServiceHandler(mcpServer, &srv, option)
 testdatamcp.ForwardToTestServiceClient(mcpServer, client, option)
 ```
 
@@ -181,19 +175,5 @@ task generate-golden
 go test ./pkg/generator -update-golden
 ```
 
-The `actual/` directory is committed to git so you can track how generator changes affect output over time.
-
 ## ⚠️ Limitations
-
-- No interceptor support (yet). Registering with a gRPC server bypasses interceptors.
-- Tool name mangling for long RPC names: If the full RPC name exceeds 64 characters (Claude desktop limit), the head of the tool name is mangled to fit.
-
-## 🗺️ Roadmap
-
-- Reflection/proxy mode
-- Interceptor middleware support in gRPC server mode
-- Support for the official Go MCP SDK (once published)
-
-## 💬 Feedback
-
-We'd love feedback, bug reports, or PRs! Join the discussion and help shape the future of Go and Protobuf MCP tooling.
+- Tool name mangling for long RPC names: If the full RPC name exceeds 64 characters, the head of the tool name is mangled to fit.
