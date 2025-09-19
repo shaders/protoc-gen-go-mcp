@@ -27,7 +27,6 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/mark3labs/mcp-go/mcp"
 	"google.golang.org/genproto/googleapis/api/annotations"
 	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/proto"
@@ -70,10 +69,16 @@ import (
   "google.golang.org/protobuf/reflect/protoreflect"
 )
 
+// Tool represents an MCP tool definition with essential fields
+type Tool struct {
+  Name        string
+  Description string
+  JSONSchema  string
+}
 
 var (
 {{- range $key, $val := .Tools }}
-  {{$key}}Tool = {{ printf "%#v" $val }}
+  {{$key}}Tool = Tool{Name: {{ printf "%q" $val.Name }}, Description: {{ printf "%q" $val.Description }}, JSONSchema: {{ printf "%q" $val.JSONSchema }}}
 {{- end }}
 )
 
@@ -174,12 +179,20 @@ func ForwardTo{{$key}}Client(s *mcpserver.MCPServer, client {{$key}}Client, opts
   }
 
   {{- range $tool_name, $tool_val := $val }}
-  {{$tool_name}}Tool := {{$key | capitalizeFirst}}_{{$tool_name}}Tool
+  {{$tool_name}}ToolDef := {{$key | capitalizeFirst}}_{{$tool_name}}Tool
+
+  // Convert simple Tool to mcp.Tool
+  {{$tool_name}}Tool := mcp.Tool{
+    Name:        {{$tool_name}}ToolDef.Name,
+    Description: {{$tool_name}}ToolDef.Description,
+    RawInputSchema: json.RawMessage({{$tool_name}}ToolDef.JSONSchema),
+  }
+
   // Add extra properties to schema if configured
   if len(config.ExtraProperties) > 0 {
     {{$tool_name}}Tool = runtime.AddExtraPropertiesToTool({{$tool_name}}Tool, config.ExtraProperties)
   }
-  
+
   s.AddTool({{$tool_name}}Tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
     var req {{$tool_val.RequestType}}
 
@@ -226,14 +239,21 @@ type TplParams struct {
 	PackageName string
 	SourcePath  string
 	GoPackage   string
-	Tools       map[string]mcp.Tool
-	Services    map[string]map[string]Tool
+	Tools       map[string]SimpleTool
+	Services    map[string]map[string]MethodInfo
 }
 
-type Tool struct {
+// SimpleTool represents the generated tool definition
+type SimpleTool struct {
+	Name        string
+	Description string
+	JSONSchema  string
+}
+
+// MethodInfo holds information about a service method
+type MethodInfo struct {
 	RequestType  string
 	ResponseType string
-	MCPTool      mcp.Tool
 }
 
 func kindToType(kind protoreflect.Kind) string {
@@ -485,7 +505,7 @@ func sanitizeForGemini(name string) string {
 	}
 
 	var result strings.Builder
-	result.Grow(min(len(name), 64))
+	result.Grow(minInt(len(name), 64))
 
 	for _, r := range name {
 		switch {
@@ -545,7 +565,7 @@ func isDigit(r rune) bool {
 	return r >= '0' && r <= '9'
 }
 
-func min(a, b int) int {
+func minInt(a, b int) int {
 	if a < b {
 		return a
 	}
@@ -617,21 +637,15 @@ func (g *FileGenerator) Generate(packageSuffix string) {
 		return
 	}
 
-	services := map[string]map[string]Tool{}
-	tools := map[string]mcp.Tool{}
+	services := map[string]map[string]MethodInfo{}
+	tools := map[string]SimpleTool{}
 
 	for _, svc := range g.f.Services {
-		s := map[string]Tool{}
+		s := map[string]MethodInfo{}
 		for _, meth := range svc.Methods {
 			// Only unary supported at the moment
 			if meth.Desc.IsStreamingClient() || meth.Desc.IsStreamingServer() {
 				continue
-			}
-
-			// Generate tool
-			tool := mcp.Tool{
-				Name:        MangleHeadIfTooLong(strings.ReplaceAll(string(meth.Desc.FullName()), ".", "_"), 64),
-				Description: cleanComment(string(meth.Comments.Leading)),
 			}
 
 			// Generate schema
@@ -640,12 +654,17 @@ func (g *FileGenerator) Generate(packageSuffix string) {
 			if err != nil {
 				panic(err)
 			}
-			tool.RawInputSchema = json.RawMessage(marshaled)
 
-			s[meth.GoName] = Tool{
+			// Create simple tool
+			tool := SimpleTool{
+				Name:        MangleHeadIfTooLong(strings.ReplaceAll(string(meth.Desc.FullName()), ".", "_"), 64),
+				Description: cleanComment(string(meth.Comments.Leading)),
+				JSONSchema:  string(marshaled),
+			}
+
+			s[meth.GoName] = MethodInfo{
 				RequestType:  g.gf.QualifiedGoIdent(meth.Input.GoIdent),
 				ResponseType: g.gf.QualifiedGoIdent(meth.Output.GoIdent),
-				MCPTool:      tool,
 			}
 
 			tools[svc.GoName+"_"+meth.GoName] = tool

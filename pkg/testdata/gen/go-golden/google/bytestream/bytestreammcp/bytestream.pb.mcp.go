@@ -20,8 +20,15 @@ import (
 	"strings"
 )
 
+// Tool represents an MCP tool definition with essential fields
+type Tool struct {
+	Name        string
+	Description string
+	JSONSchema  string
+}
+
 var (
-	ByteStream_QueryWriteStatusTool = mcp.Tool{Meta: (*mcp.Meta)(nil), Name: "google_bytestream_ByteStream_QueryWriteStatus", Description: "`QueryWriteStatus()` is used to find the `committed_size` for a resource\nthat is being written, which can then be used as the `write_offset` for\nthe next `Write()` call.\n\nIf the resource does not exist (i.e., the resource has been deleted, or the\nfirst `Write()` has not yet reached the service), this method returns the\nerror `NOT_FOUND`.\n\nThe client **may** call `QueryWriteStatus()` at any time to determine how\nmuch data has been processed for this resource. This is useful if the\nclient is buffering data and needs to know which data can be safely\nevicted. For any sequence of `QueryWriteStatus()` calls for a given\nresource name, the sequence of returned `committed_size` values will be\nnon-decreasing.\n", InputSchema: mcp.ToolInputSchema{Defs: map[string]interface{}(nil), Type: "", Properties: map[string]interface{}(nil), Required: []string(nil)}, RawInputSchema: json.RawMessage{0x7b, 0x22, 0x70, 0x72, 0x6f, 0x70, 0x65, 0x72, 0x74, 0x69, 0x65, 0x73, 0x22, 0x3a, 0x7b, 0x22, 0x72, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x22, 0x3a, 0x7b, 0x22, 0x74, 0x79, 0x70, 0x65, 0x22, 0x3a, 0x22, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67, 0x22, 0x7d, 0x7d, 0x2c, 0x22, 0x72, 0x65, 0x71, 0x75, 0x69, 0x72, 0x65, 0x64, 0x22, 0x3a, 0x5b, 0x5d, 0x2c, 0x22, 0x74, 0x79, 0x70, 0x65, 0x22, 0x3a, 0x22, 0x6f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x22, 0x7d}, RawOutputSchema: json.RawMessage(nil), Annotations: mcp.ToolAnnotation{Title: "", ReadOnlyHint: (*bool)(nil), DestructiveHint: (*bool)(nil), IdempotentHint: (*bool)(nil), OpenWorldHint: (*bool)(nil)}}
+	ByteStream_QueryWriteStatusTool = Tool{Name: "google_bytestream_ByteStream_QueryWriteStatus", Description: "`QueryWriteStatus()` is used to find the `committed_size` for a resource\nthat is being written, which can then be used as the `write_offset` for\nthe next `Write()` call.\n\nIf the resource does not exist (i.e., the resource has been deleted, or the\nfirst `Write()` has not yet reached the service), this method returns the\nerror `NOT_FOUND`.\n\nThe client **may** call `QueryWriteStatus()` at any time to determine how\nmuch data has been processed for this resource. This is useful if the\nclient is buffering data and needs to know which data can be safely\nevicted. For any sequence of `QueryWriteStatus()` calls for a given\nresource name, the sequence of returned `committed_size` values will be\nnon-decreasing.\n", JSONSchema: "{\"properties\":{\"resource_name\":{\"type\":\"string\"}},\"required\":[],\"type\":\"object\"}"}
 )
 
 // ByteStreamClient is compatible with the grpc-go client interface.
@@ -107,7 +114,15 @@ func ForwardToByteStreamClient(s *mcpserver.MCPServer, client ByteStreamClient, 
 	for _, opt := range opts {
 		opt(config)
 	}
-	QueryWriteStatusTool := ByteStream_QueryWriteStatusTool
+	QueryWriteStatusToolDef := ByteStream_QueryWriteStatusTool
+
+	// Convert simple Tool to mcp.Tool
+	QueryWriteStatusTool := mcp.Tool{
+		Name:           QueryWriteStatusToolDef.Name,
+		Description:    QueryWriteStatusToolDef.Description,
+		RawInputSchema: json.RawMessage(QueryWriteStatusToolDef.JSONSchema),
+	}
+
 	// Add extra properties to schema if configured
 	if len(config.ExtraProperties) > 0 {
 		QueryWriteStatusTool = runtime.AddExtraPropertiesToTool(QueryWriteStatusTool, config.ExtraProperties)
