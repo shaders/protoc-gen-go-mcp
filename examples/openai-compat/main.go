@@ -32,16 +32,14 @@ var (
 func main() {
 	// Create MCP server
 	s := server.NewMCPServer(
-		"Example auto-generated gRPC-MCP (OpenAI-compatible)",
+		"Example auto-generated gRPC-MCP",
 		"1.0.0",
 	)
 
 	srv := testServer{}
 
-	// This example demonstrates OpenAI-compatible handlers
-	// Now that we generate both, we can choose the OpenAI variant explicitly
-	fmt.Printf("Using OpenAI-compatible MCP handlers\n")
-	testdatamcp.RegisterTestServiceHandlerOpenAI(s, &srv)
+	// Register MCP handlers
+	testdatamcp.RegisterTestServiceHandler(s, &srv)
 
 	testdatamcp.ForwardToTestServiceClient(s, grpcClient)
 

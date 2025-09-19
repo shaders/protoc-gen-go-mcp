@@ -16,7 +16,7 @@ It generates `*.pb.mcp.go` files for each protobuf service, enabling you to dele
 - 📦 Outputs JSON Schema for method inputs  
 - 🔄 Wire up to gRPC servers/clients  
 - 🧩 Easy integration with [`buf`](https://buf.build)  
-- 🎯 **Runtime LLM provider selection** - Choose between standard MCP and OpenAI-compatible schemas at runtime  
+  
 
 ## 🔧 Usage
 
@@ -63,38 +63,6 @@ testdatamcp.RegisterTestServiceHandler(mcpServer, &srv)
 
 Each RPC method in your protobuf service becomes an MCP tool.
 
-### Runtime LLM Provider Selection
-
-**New!** You can now choose LLM compatibility at runtime without regenerating code:
-
-```go
-// Option 1: Use convenience function with runtime provider selection
-provider := testdatamcp.LLMProviderOpenAI // or LLMProviderStandard
-testdatamcp.RegisterTestServiceHandlerWithProvider(mcpServer, &srv, provider)
-
-// Option 2: Register specific handlers directly
-testdatamcp.RegisterTestServiceHandler(mcpServer, &srv)        // Standard MCP
-testdatamcp.RegisterTestServiceHandlerOpenAI(mcpServer, &srv)  // OpenAI-compatible
-
-// Option 3: Register both for different tool names
-testdatamcp.RegisterTestServiceHandler(mcpServer, &srv)
-testdatamcp.RegisterTestServiceHandlerOpenAI(mcpServer, &srv)
-```
-
-**Environment variable example:**
-```go
-providerStr := os.Getenv("LLM_PROVIDER")
-var provider testdatamcp.LLMProvider
-switch providerStr {
-case "openai":
-    provider = testdatamcp.LLMProviderOpenAI
-case "standard":
-    fallthrough
-default:
-    provider = testdatamcp.LLMProviderStandard
-}
-testdatamcp.RegisterTestServiceHandlerWithProvider(mcpServer, &srv, provider)
-```
 
 ➡️ See the [full example](./examples/basic) for details.
 
@@ -129,39 +97,6 @@ testdatamcp.RegisterTestServiceHandler(mcpServer, &srv, option)
 testdatamcp.ForwardToTestServiceClient(mcpServer, client, option)
 ```
 
-## LLM Provider Compatibility
-
-The generator now creates both standard MCP and OpenAI-compatible handlers automatically. You can choose which to use at runtime:
-
-### Standard MCP
-- Full JSON Schema support (additionalProperties, anyOf, oneOf)
-- Maps represented as JSON objects
-- Well-known types use native JSON representations
-
-### OpenAI Compatible  
-- Restricted JSON Schema (no additionalProperties, anyOf, oneOf)
-- Maps converted to arrays of key-value pairs
-- Well-known types (Struct, Value, ListValue) encoded as JSON strings
-- All fields marked as required with nullable unions
-
-### Migration from openai_compat flag
-
-The old `openai_compat=true` protoc option is **deprecated but still supported** for backward compatibility. With the new approach:
-
-**Before (compile-time):**
-```yaml
-# buf.gen.yaml
-plugins:
-  - local: [.../protoc-gen-go-mcp]
-    out: ./gen/go
-    opt: paths=source_relative,openai_compat=true
-```
-
-**After (runtime):**
-```go
-// Choose at runtime
-testdatamcp.RegisterTestServiceHandlerWithProvider(server, srv, testdatamcp.LLMProviderOpenAI)
-```
 
 ## 🧪 Development & Testing
 

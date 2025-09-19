@@ -43,8 +43,7 @@ type FileGenerator struct {
 	f   *protogen.File
 	gen *protogen.Plugin
 
-	gf           *protogen.GeneratedFile
-	openAICompat bool
+	gf *protogen.GeneratedFile
 }
 
 func NewFileGenerator(f *protogen.File, gen *protogen.Plugin) *FileGenerator {
@@ -75,9 +74,6 @@ import (
 var (
 {{- range $key, $val := .Tools }}
   {{$key}}Tool = {{ printf "%#v" $val }}
-{{- end }}
-{{- range $key, $val := .ToolsOpenAI }}
-  {{$key}}ToolOpenAI = {{ printf "%#v" $val }}
 {{- end }}
 )
 
@@ -141,69 +137,6 @@ func Register{{$key}}Handler(s *mcpserver.MCPServer, srv {{$key}}Server, opts ..
   {{- end }}
 }
 
-// Register{{$key}}HandlerOpenAI registers OpenAI-compatible MCP handlers for {{$key}}
-func Register{{$key}}HandlerOpenAI(s *mcpserver.MCPServer, srv {{$key}}Server, opts ...runtime.Option) {
-  config := runtime.NewConfig()
-  for _, opt := range opts {
-    opt(config)
-  }
-
-  {{- range $tool_name, $tool_val := $val }}
-  {{$tool_name}}ToolOpenAI := {{$key | capitalizeFirst}}_{{$tool_name}}ToolOpenAI
-  // Add extra properties to schema if configured
-  if len(config.ExtraProperties) > 0 {
-    {{$tool_name}}ToolOpenAI = runtime.AddExtraPropertiesToTool({{$tool_name}}ToolOpenAI, config.ExtraProperties)
-  }
-  
-  s.AddTool({{$tool_name}}ToolOpenAI, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-    var req {{$tool_val.RequestType}}
-
-    message := request.GetArguments()
-
-    // Extract extra properties if configured
-    for _, prop := range config.ExtraProperties {
-      if propVal, ok := message[prop.Name]; ok {
-        ctx = context.WithValue(ctx, prop.ContextKey, propVal)
-      }
-    }
-
-    runtime.FixOpenAI(req.ProtoReflect().Descriptor(), message)
-
-    marshaled, err := json.Marshal(message)
-    if err != nil {
-      return nil, err
-    }
-
-    if err := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(marshaled, &req); err != nil {
-      return nil, err
-    }
-
-    resp, err := srv.{{$tool_name}}(ctx, &req)
-    if err != nil {
-      return runtime.HandleError(err)
-    }
-
-    marshaled, err = (protojson.MarshalOptions{UseProtoNames: true, EmitDefaultValues: true}).Marshal(resp)
-    if err != nil {
-      return nil, err
-    }
-
-    return mcp.NewToolResultText(string(marshaled)), nil
-  })
-  {{- end }}
-}
-
-// Register{{$key}}HandlerWithProvider registers handlers for the specified LLM provider
-func Register{{$key}}HandlerWithProvider(s *mcpserver.MCPServer, srv {{$key}}Server, provider runtime.LLMProvider, opts ...runtime.Option) {
-  switch provider {
-  case runtime.LLMProviderOpenAI:
-    Register{{$key}}HandlerOpenAI(s, srv, opts...)
-  case runtime.LLMProviderStandard:
-    fallthrough
-  default:
-    Register{{$key}}Handler(s, srv, opts...)
-  }
-}
 {{- end }}
 
 {{- range $serviceName, $methods := .Services }}
@@ -354,15 +287,13 @@ type TplParams struct {
 	SourcePath  string
 	GoPackage   string
 	Tools       map[string]mcp.Tool
-	ToolsOpenAI map[string]mcp.Tool
 	Services    map[string]map[string]Tool
 }
 
 type Tool struct {
-	RequestType   string
-	ResponseType  string
-	MCPTool       mcp.Tool
-	MCPToolOpenAI mcp.Tool
+	RequestType  string
+	ResponseType string
+	MCPTool      mcp.Tool
 }
 
 func kindToType(kind protoreflect.Kind) string {
@@ -414,40 +345,19 @@ func (g *FileGenerator) messageSchema(md protoreflect.MessageDescriptor) map[str
 
 		// OneOf handling
 		if oneof := nestedFd.ContainingOneof(); oneof != nil && !oneof.IsSynthetic() {
-			if !g.openAICompat {
-				if _, ok := oneOf[string(oneof.Name())]; !ok {
-					oneOf[string(oneof.Name())] = []map[string]any{}
-				}
-				oneOf[string(oneof.Name())] = append(oneOf[string(oneof.Name())], map[string]any{
-					"properties": map[string]any{
-						name: g.getType(nestedFd),
-					},
-					"required": []string{name},
-				})
-			} else {
-				// OpenAI compatibility mode. Oneof, Anyof are not supported, therefore just use ordinary fields, BUT add extra comments.
-				schema := g.getType(nestedFd)
-
-				// Replace type with a union of the actual type and null.
-				// This is the suggested way to work around OpenAI's requirement to make all fields
-				// required, but still allowing the LLM to not put a value (kind of).
-				// See https://platform.openai.com/docs/guides/structured-outputs/supported-schemas#all-fields-must-be-required
-				if v, ok := schema["type"].(string); ok {
-					schema["type"] = []string{v, "null"}
-				}
-				normalFields[name] = schema
-				schema["description"] = fmt.Sprintf("Note: This field is part of the '%s' oneof group. Only one field in this group can be set at a time. Setting multiple fields in the group WILL result in an error. Protobuf oneOf semantics apply.", oneof.Name())
-				if isFieldRequired(nestedFd) {
-					required = append(required, name)
-				}
-
-				// In OpenAI, all fields must be marked as required.
-				required = append(required, name)
+			if _, ok := oneOf[string(oneof.Name())]; !ok {
+				oneOf[string(oneof.Name())] = []map[string]any{}
 			}
+			oneOf[string(oneof.Name())] = append(oneOf[string(oneof.Name())], map[string]any{
+				"properties": map[string]any{
+					name: g.getType(nestedFd),
+				},
+				"required": []string{name},
+			})
 		} else {
 			// If not part of a oneof, handle as a normal field
 			normalFields[name] = g.getType(nestedFd)
-			if isFieldRequired(nestedFd) || g.openAICompat { // In OpenAI, everything is required.
+			if isFieldRequired(nestedFd) {
 				required = append(required, name)
 			}
 		}
@@ -473,18 +383,6 @@ func (g *FileGenerator) messageSchema(md protoreflect.MessageDescriptor) map[str
 	if anyOf != nil {
 		result["anyOf"] = anyOf // Fields in properties are already allowed. anyOf is in addition - which covers all oneOf groups
 	}
-	// OpenAI requires "additionalProperties: false", always.
-	if g.openAICompat {
-		result["additionalProperties"] = false
-		// Replace type with a union of the actual type and null.
-		// This is the suggested way to work around OpenAI's requirement to make all fields
-		// required, but still allowing the LLM to not put a value (kind of).
-		// See https://platform.openai.com/docs/guides/structured-outputs/supported-schemas#all-fields-must-be-required
-		if v, ok := result["type"].(string); ok {
-			result["type"] = []string{v, "null"}
-		}
-
-	}
 
 	return result
 }
@@ -501,24 +399,6 @@ func (g *FileGenerator) getType(fd protoreflect.FieldDescriptor) map[string]any 
 			keyConstraints["pattern"] = "^(0|[1-9]\\d*)$"
 		case protoreflect.Int32Kind, protoreflect.Sint32Kind, protoreflect.Sfixed32Kind, protoreflect.Int64Kind, protoreflect.Sint64Kind, protoreflect.Sfixed64Kind:
 			keyConstraints["pattern"] = "^-?(0|[1-9]\\d*)$"
-		}
-
-		if g.openAICompat {
-			return map[string]any{
-				"type":        "array",
-				"description": "List of key value pairs",
-				"items": map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"key": map[string]any{"type": "string"},
-						"value": map[string]any{
-							"type": g.getType(fd.MapValue())["type"],
-						},
-					},
-					"required":             []string{"key", "value"},
-					"additionalProperties": false,
-				},
-			}
 		}
 
 		return map[string]any{
@@ -539,66 +419,30 @@ func (g *FileGenerator) getType(fd protoreflect.FieldDescriptor) map[string]any 
 		case "google.protobuf.Duration":
 			schema = map[string]any{"type": []string{"string", "null"}, "pattern": `^-?[0-9]+(\.[0-9]+)?s$`}
 		case "google.protobuf.Struct":
-			if g.openAICompat {
-				schema = map[string]any{
-					"type":        "string",
-					"description": "string representation of any JSON object. represents a google.protobuf.Struct, a dynamic JSON object.",
-				}
-			} else {
-				schema = map[string]any{
-					"type":                 "object",
-					"additionalProperties": true,
-				}
+			schema = map[string]any{
+				"type":                 "object",
+				"additionalProperties": true,
 			}
 		case "google.protobuf.Value":
-			if g.openAICompat {
-				schema = map[string]any{
-					"type":        "string",
-					"description": "string representation of any JSON value. represents a google.protobuf.Value, a dynamic JSON value (string, number, boolean, array, object).",
-				}
-			} else {
-				schema = map[string]any{
-					"description": "represents a google.protobuf.Value, a dynamic JSON value (string, number, boolean, array, object).",
-				}
+			schema = map[string]any{
+				"description": "represents a google.protobuf.Value, a dynamic JSON value (string, number, boolean, array, object).",
 			}
 		case "google.protobuf.ListValue":
-			if g.openAICompat {
-				schema = map[string]any{
-					"type":        "string",
-					"description": "string representation of a JSON array. represents a google.protobuf.ListValue, a JSON array of values.",
-				}
-			} else {
-				schema = map[string]any{
-					"type":        "array",
-					"description": "represents a google.protobuf.ListValue, a JSON array of values.",
-					"items":       map[string]any{},
-				}
+			schema = map[string]any{
+				"type":        "array",
+				"description": "represents a google.protobuf.ListValue, a JSON array of values.",
+				"items":       map[string]any{},
 			}
 		case "google.protobuf.FieldMask":
-			if g.openAICompat {
-				schema = map[string]any{"type": []string{"string", "null"}}
-			} else {
-				schema = map[string]any{"type": "string"}
-			}
+			schema = map[string]any{"type": "string"}
 		case "google.protobuf.Any":
-			if g.openAICompat {
-				schema = map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"@type": map[string]any{"type": "string"},
-						"value": map[string]any{},
-					},
-					"required": []string{"@type"},
-				}
-			} else {
-				schema = map[string]any{
-					"type": []string{"object", "null"},
-					"properties": map[string]any{
-						"@type": map[string]any{"type": "string"},
-						"value": map[string]any{},
-					},
-					"required": []string{"@type"},
-				}
+			schema = map[string]any{
+				"type": []string{"object", "null"},
+				"properties": map[string]any{
+					"@type": map[string]any{"type": "string"},
+					"value": map[string]any{},
+				},
+				"required": []string{"@type"},
 			}
 		case "google.protobuf.DoubleValue", "google.protobuf.FloatValue",
 			"google.protobuf.Int32Value", "google.protobuf.UInt32Value":
@@ -610,11 +454,7 @@ func (g *FileGenerator) getType(fd protoreflect.FieldDescriptor) map[string]any 
 		case "google.protobuf.BoolValue":
 			schema = map[string]any{"type": "boolean", "nullable": true}
 		case "google.protobuf.BytesValue":
-			if g.openAICompat {
-				schema = map[string]any{"type": "string", "nullable": true}
-			} else {
-				schema = map[string]any{"type": "string", "format": "byte", "nullable": true}
-			}
+			schema = map[string]any{"type": "string", "format": "byte", "nullable": true}
 		default:
 			schema = g.messageSchema(fd.Message())
 		}
@@ -635,9 +475,7 @@ func (g *FileGenerator) getType(fd protoreflect.FieldDescriptor) map[string]any 
 		}
 		if fd.Kind() == protoreflect.BytesKind {
 			schema["contentEncoding"] = "base64"
-			if !g.openAICompat {
-				schema["format"] = "byte"
-			}
+			schema["format"] = "byte"
 		}
 	}
 
@@ -760,7 +598,6 @@ func (g *FileGenerator) Generate(packageSuffix string) {
 
 	services := map[string]map[string]Tool{}
 	tools := map[string]mcp.Tool{}
-	toolsOpenAI := map[string]mcp.Tool{}
 
 	for _, svc := range g.f.Services {
 		s := map[string]Tool{}
@@ -770,47 +607,27 @@ func (g *FileGenerator) Generate(packageSuffix string) {
 				continue
 			}
 
-			// Generate standard tool
-			toolStandard := mcp.Tool{
+			// Generate tool
+			tool := mcp.Tool{
 				Name:        MangleHeadIfTooLong(strings.ReplaceAll(string(meth.Desc.FullName()), ".", "_"), 64),
 				Description: cleanComment(string(meth.Comments.Leading)),
 			}
 
-			// Generate standard schema
-			g.openAICompat = false
-			standardSchema := g.messageSchema(meth.Input.Desc)
-			marshaledStandard, err := json.Marshal(standardSchema)
+			// Generate schema
+			schema := g.messageSchema(meth.Input.Desc)
+			marshaled, err := json.Marshal(schema)
 			if err != nil {
 				panic(err)
 			}
-			toolStandard.RawInputSchema = json.RawMessage(marshaledStandard)
-
-			// Generate OpenAI tool
-			toolOpenAI := mcp.Tool{
-				Name:        MangleHeadIfTooLong(strings.ReplaceAll(string(meth.Desc.FullName()), ".", "_"), 64),
-				Description: cleanComment(string(meth.Comments.Leading)),
-			}
-
-			// Generate OpenAI schema
-			g.openAICompat = true
-			openAISchema := g.messageSchema(meth.Input.Desc)
-			// In OpenAI mode, we use type ["my-type", "null"] to make it nullable, but many tools don't like this for the top-level schema object.
-			openAISchema["type"] = "object"
-			marshaledOpenAI, err := json.Marshal(openAISchema)
-			if err != nil {
-				panic(err)
-			}
-			toolOpenAI.RawInputSchema = json.RawMessage(marshaledOpenAI)
+			tool.RawInputSchema = json.RawMessage(marshaled)
 
 			s[meth.GoName] = Tool{
-				RequestType:   g.gf.QualifiedGoIdent(meth.Input.GoIdent),
-				ResponseType:  g.gf.QualifiedGoIdent(meth.Output.GoIdent),
-				MCPTool:       toolStandard,
-				MCPToolOpenAI: toolOpenAI,
+				RequestType:  g.gf.QualifiedGoIdent(meth.Input.GoIdent),
+				ResponseType: g.gf.QualifiedGoIdent(meth.Output.GoIdent),
+				MCPTool:      tool,
 			}
 
-			tools[svc.GoName+"_"+meth.GoName] = toolStandard
-			toolsOpenAI[svc.GoName+"_"+meth.GoName] = toolOpenAI
+			tools[svc.GoName+"_"+meth.GoName] = tool
 		}
 		services[string(svc.Desc.Name())] = s
 	}
@@ -821,7 +638,6 @@ func (g *FileGenerator) Generate(packageSuffix string) {
 		GoPackage:   string(g.f.GoPackageName),
 		Services:    services,
 		Tools:       tools,
-		ToolsOpenAI: toolsOpenAI,
 	}
 	err = tpl.Execute(g.gf, params)
 	if err != nil {

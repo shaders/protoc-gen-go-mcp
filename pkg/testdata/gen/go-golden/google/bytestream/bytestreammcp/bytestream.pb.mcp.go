@@ -21,8 +21,7 @@ import (
 )
 
 var (
-	ByteStream_QueryWriteStatusTool       = mcp.Tool{Meta: (*mcp.Meta)(nil), Name: "google_bytestream_ByteStream_QueryWriteStatus", Description: "`QueryWriteStatus()` is used to find the `committed_size` for a resource\nthat is being written, which can then be used as the `write_offset` for\nthe next `Write()` call.\n\nIf the resource does not exist (i.e., the resource has been deleted, or the\nfirst `Write()` has not yet reached the service), this method returns the\nerror `NOT_FOUND`.\n\nThe client **may** call `QueryWriteStatus()` at any time to determine how\nmuch data has been processed for this resource. This is useful if the\nclient is buffering data and needs to know which data can be safely\nevicted. For any sequence of `QueryWriteStatus()` calls for a given\nresource name, the sequence of returned `committed_size` values will be\nnon-decreasing.\n", InputSchema: mcp.ToolInputSchema{Defs: map[string]interface{}(nil), Type: "", Properties: map[string]interface{}(nil), Required: []string(nil)}, RawInputSchema: json.RawMessage{0x7b, 0x22, 0x70, 0x72, 0x6f, 0x70, 0x65, 0x72, 0x74, 0x69, 0x65, 0x73, 0x22, 0x3a, 0x7b, 0x22, 0x72, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x22, 0x3a, 0x7b, 0x22, 0x74, 0x79, 0x70, 0x65, 0x22, 0x3a, 0x22, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67, 0x22, 0x7d, 0x7d, 0x2c, 0x22, 0x72, 0x65, 0x71, 0x75, 0x69, 0x72, 0x65, 0x64, 0x22, 0x3a, 0x5b, 0x5d, 0x2c, 0x22, 0x74, 0x79, 0x70, 0x65, 0x22, 0x3a, 0x22, 0x6f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x22, 0x7d}, RawOutputSchema: json.RawMessage(nil), Annotations: mcp.ToolAnnotation{Title: "", ReadOnlyHint: (*bool)(nil), DestructiveHint: (*bool)(nil), IdempotentHint: (*bool)(nil), OpenWorldHint: (*bool)(nil)}}
-	ByteStream_QueryWriteStatusToolOpenAI = mcp.Tool{Meta: (*mcp.Meta)(nil), Name: "google_bytestream_ByteStream_QueryWriteStatus", Description: "`QueryWriteStatus()` is used to find the `committed_size` for a resource\nthat is being written, which can then be used as the `write_offset` for\nthe next `Write()` call.\n\nIf the resource does not exist (i.e., the resource has been deleted, or the\nfirst `Write()` has not yet reached the service), this method returns the\nerror `NOT_FOUND`.\n\nThe client **may** call `QueryWriteStatus()` at any time to determine how\nmuch data has been processed for this resource. This is useful if the\nclient is buffering data and needs to know which data can be safely\nevicted. For any sequence of `QueryWriteStatus()` calls for a given\nresource name, the sequence of returned `committed_size` values will be\nnon-decreasing.\n", InputSchema: mcp.ToolInputSchema{Defs: map[string]interface{}(nil), Type: "", Properties: map[string]interface{}(nil), Required: []string(nil)}, RawInputSchema: json.RawMessage{0x7b, 0x22, 0x61, 0x64, 0x64, 0x69, 0x74, 0x69, 0x6f, 0x6e, 0x61, 0x6c, 0x50, 0x72, 0x6f, 0x70, 0x65, 0x72, 0x74, 0x69, 0x65, 0x73, 0x22, 0x3a, 0x66, 0x61, 0x6c, 0x73, 0x65, 0x2c, 0x22, 0x70, 0x72, 0x6f, 0x70, 0x65, 0x72, 0x74, 0x69, 0x65, 0x73, 0x22, 0x3a, 0x7b, 0x22, 0x72, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x22, 0x3a, 0x7b, 0x22, 0x74, 0x79, 0x70, 0x65, 0x22, 0x3a, 0x22, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67, 0x22, 0x7d, 0x7d, 0x2c, 0x22, 0x72, 0x65, 0x71, 0x75, 0x69, 0x72, 0x65, 0x64, 0x22, 0x3a, 0x5b, 0x22, 0x72, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x22, 0x5d, 0x2c, 0x22, 0x74, 0x79, 0x70, 0x65, 0x22, 0x3a, 0x22, 0x6f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x22, 0x7d}, RawOutputSchema: json.RawMessage(nil), Annotations: mcp.ToolAnnotation{Title: "", ReadOnlyHint: (*bool)(nil), DestructiveHint: (*bool)(nil), IdempotentHint: (*bool)(nil), OpenWorldHint: (*bool)(nil)}}
+	ByteStream_QueryWriteStatusTool = mcp.Tool{Meta: (*mcp.Meta)(nil), Name: "google_bytestream_ByteStream_QueryWriteStatus", Description: "`QueryWriteStatus()` is used to find the `committed_size` for a resource\nthat is being written, which can then be used as the `write_offset` for\nthe next `Write()` call.\n\nIf the resource does not exist (i.e., the resource has been deleted, or the\nfirst `Write()` has not yet reached the service), this method returns the\nerror `NOT_FOUND`.\n\nThe client **may** call `QueryWriteStatus()` at any time to determine how\nmuch data has been processed for this resource. This is useful if the\nclient is buffering data and needs to know which data can be safely\nevicted. For any sequence of `QueryWriteStatus()` calls for a given\nresource name, the sequence of returned `committed_size` values will be\nnon-decreasing.\n", InputSchema: mcp.ToolInputSchema{Defs: map[string]interface{}(nil), Type: "", Properties: map[string]interface{}(nil), Required: []string(nil)}, RawInputSchema: json.RawMessage{0x7b, 0x22, 0x70, 0x72, 0x6f, 0x70, 0x65, 0x72, 0x74, 0x69, 0x65, 0x73, 0x22, 0x3a, 0x7b, 0x22, 0x72, 0x65, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x22, 0x3a, 0x7b, 0x22, 0x74, 0x79, 0x70, 0x65, 0x22, 0x3a, 0x22, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67, 0x22, 0x7d, 0x7d, 0x2c, 0x22, 0x72, 0x65, 0x71, 0x75, 0x69, 0x72, 0x65, 0x64, 0x22, 0x3a, 0x5b, 0x5d, 0x2c, 0x22, 0x74, 0x79, 0x70, 0x65, 0x22, 0x3a, 0x22, 0x6f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x22, 0x7d}, RawOutputSchema: json.RawMessage(nil), Annotations: mcp.ToolAnnotation{Title: "", ReadOnlyHint: (*bool)(nil), DestructiveHint: (*bool)(nil), IdempotentHint: (*bool)(nil), OpenWorldHint: (*bool)(nil)}}
 )
 
 // ByteStreamServer is compatible with the grpc-go server interface.
@@ -75,67 +74,6 @@ func RegisterByteStreamHandler(s *mcpserver.MCPServer, srv ByteStreamServer, opt
 
 		return mcp.NewToolResultText(string(marshaled)), nil
 	})
-}
-
-// RegisterByteStreamHandlerOpenAI registers OpenAI-compatible MCP handlers for ByteStream
-func RegisterByteStreamHandlerOpenAI(s *mcpserver.MCPServer, srv ByteStreamServer, opts ...runtime.Option) {
-	config := runtime.NewConfig()
-	for _, opt := range opts {
-		opt(config)
-	}
-	QueryWriteStatusToolOpenAI := ByteStream_QueryWriteStatusToolOpenAI
-	// Add extra properties to schema if configured
-	if len(config.ExtraProperties) > 0 {
-		QueryWriteStatusToolOpenAI = runtime.AddExtraPropertiesToTool(QueryWriteStatusToolOpenAI, config.ExtraProperties)
-	}
-
-	s.AddTool(QueryWriteStatusToolOpenAI, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		var req bytestream.QueryWriteStatusRequest
-
-		message := request.GetArguments()
-
-		// Extract extra properties if configured
-		for _, prop := range config.ExtraProperties {
-			if propVal, ok := message[prop.Name]; ok {
-				ctx = context.WithValue(ctx, prop.ContextKey, propVal)
-			}
-		}
-
-		runtime.FixOpenAI(req.ProtoReflect().Descriptor(), message)
-
-		marshaled, err := json.Marshal(message)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(marshaled, &req); err != nil {
-			return nil, err
-		}
-
-		resp, err := srv.QueryWriteStatus(ctx, &req)
-		if err != nil {
-			return runtime.HandleError(err)
-		}
-
-		marshaled, err = (protojson.MarshalOptions{UseProtoNames: true, EmitDefaultValues: true}).Marshal(resp)
-		if err != nil {
-			return nil, err
-		}
-
-		return mcp.NewToolResultText(string(marshaled)), nil
-	})
-}
-
-// RegisterByteStreamHandlerWithProvider registers handlers for the specified LLM provider
-func RegisterByteStreamHandlerWithProvider(s *mcpserver.MCPServer, srv ByteStreamServer, provider runtime.LLMProvider, opts ...runtime.Option) {
-	switch provider {
-	case runtime.LLMProviderOpenAI:
-		RegisterByteStreamHandlerOpenAI(s, srv, opts...)
-	case runtime.LLMProviderStandard:
-		fallthrough
-	default:
-		RegisterByteStreamHandler(s, srv, opts...)
-	}
 }
 
 // ByteStreamClient is compatible with the grpc-go client interface.
