@@ -4,7 +4,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/shaders/protoc-gen-go-mcp)](https://goreportcard.com/report/github.com/shaders/protoc-gen-go-mcp)
 [![codecov](https://codecov.io/gh/redpanda-data/protoc-gen-go-mcp/branch/main/graph/badge.svg)](https://codecov.io/gh/redpanda-data/protoc-gen-go-mcp)
 
-**`protoc-gen-go-mcp`** is a [Protocol Buffers](https://protobuf.dev) compiler plugin that generates [Model Context Protocol (MCP)](https://modelcontextprotocol.io) servers for your `gRPC` or `ConnectRPC` APIs.
+**`protoc-gen-go-mcp`** is a [Protocol Buffers](https://protobuf.dev) compiler plugin that generates [Model Context Protocol (MCP)](https://modelcontextprotocol.io) servers for your `gRPC` APIs.
 
 It generates `*.pb.mcp.go` files for each protobuf service, enabling you to delegate handlers directly to gRPC servers or clients. Under the hood, MCP uses JSON Schema for tool inputs—`protoc-gen-go-mcp` auto-generates these schemas from your method input descriptors.
 
@@ -14,7 +14,7 @@ It generates `*.pb.mcp.go` files for each protobuf service, enabling you to dele
 
 - 🚀 Auto-generates MCP handlers from your `.proto` services  
 - 📦 Outputs JSON Schema for method inputs  
-- 🔄 Wire up to gRPC or ConnectRPC servers/clients  
+- 🔄 Wire up to gRPC servers/clients  
 - 🧩 Easy integration with [`buf`](https://buf.build)  
 - 🎯 **Runtime LLM provider selection** - Choose between standard MCP and OpenAI-compatible schemas at runtime  
 
@@ -98,21 +98,15 @@ testdatamcp.RegisterTestServiceHandlerWithProvider(mcpServer, &srv, provider)
 
 ➡️ See the [full example](./examples/basic) for details.
 
-### Wiring up with grpc and connectrpc client
+### Wiring up with gRPC client
 
-It is also possible to directly forward MCP tool calls to gRPC clients. 
+It is also possible to directly forward MCP tool calls to gRPC clients.
 
 ```go
 testdatamcp.ForwardToTestServiceClient(mcpServer, myGrpcClient)
 ```
 
-Same for connectrpc:
-
-```go
-testdatamcp.ForwardToConnectTestServiceClient(mcpServer, myConnectClient)
-```
-
-This directly connects the MCP handler to the connectrpc client, requiring zero boilerplate.
+This directly connects the MCP handler to the gRPC client, requiring zero boilerplate.
 
 ### Extra properties
 

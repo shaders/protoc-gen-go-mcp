@@ -8,7 +8,6 @@ import (
 )
 
 import (
-	"connectrpc.com/connect"
 	"context"
 	"encoding/json"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -16,6 +15,9 @@ import (
 	"github.com/shaders/protoc-gen-go-mcp/pkg/runtime"
 	grpc "google.golang.org/grpc"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"strings"
 )
 
 var (
@@ -141,55 +143,76 @@ type ByteStreamClient interface {
 	QueryWriteStatus(ctx context.Context, req *bytestream.QueryWriteStatusRequest, opts ...grpc.CallOption) (*bytestream.QueryWriteStatusResponse, error)
 }
 
-// ConnectByteStreamClient is compatible with the connectrpc-go client interface.
-type ConnectByteStreamClient interface {
-	QueryWriteStatus(ctx context.Context, req *connect.Request[bytestream.QueryWriteStatusRequest]) (*connect.Response[bytestream.QueryWriteStatusResponse], error)
-}
-
-// ForwardToConnectByteStreamClient registers a connectrpc client, to forward MCP calls to it.
-func ForwardToConnectByteStreamClient(s *mcpserver.MCPServer, client ConnectByteStreamClient, opts ...runtime.Option) {
-	config := runtime.NewConfig()
-	for _, opt := range opts {
-		opt(config)
-	}
-	QueryWriteStatusTool := ByteStream_QueryWriteStatusTool
-	// Add extra properties to schema if configured
-	if len(config.ExtraProperties) > 0 {
-		QueryWriteStatusTool = runtime.AddExtraPropertiesToTool(QueryWriteStatusTool, config.ExtraProperties)
+// TODO: BUG: https://github.com/anthropics/claude-code/issues/3084
+// ByteStreamNormalizeTopLevelJSONStringsForOneofs scans m's top level and, for keys that are members
+// of any (or selected) oneof(s) in the given proto message type, it will parse string values
+// that look like JSON and replace them with the parsed value.
+// If oneofNames is empty, all oneofs are considered. Otherwise only the named oneofs are used.
+func ByteStreamNormalizeTopLevelJSONStringsForOneofs(
+	m map[string]interface{},
+	msg proto.Message,
+	oneofNames ...string,
+) (changed bool) {
+	if m == nil || msg == nil {
+		return false
 	}
 
-	s.AddTool(QueryWriteStatusTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		var req bytestream.QueryWriteStatusRequest
-
-		message := request.GetArguments()
-
-		// Extract extra properties if configured
-		for _, prop := range config.ExtraProperties {
-			if propVal, ok := message[prop.Name]; ok {
-				ctx = context.WithValue(ctx, prop.ContextKey, propVal)
+	md := msg.ProtoReflect().Descriptor()
+	// Build a set of target oneof descriptors
+	var targetOneofs map[protoreflect.OneofDescriptor]struct{}
+	if len(oneofNames) > 0 {
+		targetOneofs = map[protoreflect.OneofDescriptor]struct{}{}
+	outer:
+		for i := 0; i < md.Oneofs().Len(); i++ {
+			od := md.Oneofs().Get(i)
+			for _, name := range oneofNames {
+				if string(od.Name()) == name {
+					targetOneofs[od] = struct{}{}
+					continue outer
+				}
 			}
 		}
+	}
 
-		marshaled, err := json.Marshal(message)
-		if err != nil {
-			return nil, err
+	// Collect JSON names of fields that belong to the target oneof(s)
+	jsonNames := map[string]struct{}{}
+	for i := 0; i < md.Fields().Len(); i++ {
+		fd := md.Fields().Get(i)
+		if fd.ContainingOneof() == nil {
+			continue
 		}
+		if targetOneofs != nil {
+			if _, ok := targetOneofs[fd.ContainingOneof()]; !ok {
+				continue
+			}
+		}
+		// fd.JSONName() is the canonical JSON field name ("cat", "dog", ...)
+		jsonNames[fd.JSONName()] = struct{}{}
+		// Also consider the proto field name in case your map uses snake_case
+		jsonNames[string(fd.Name())] = struct{}{}
+	}
 
-		if err := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(marshaled, &req); err != nil {
-			return nil, err
+	// Rewrite top-level stringified JSON for those keys
+	for k, v := range m {
+		if _, ok := jsonNames[k]; !ok {
+			continue
 		}
-
-		resp, err := client.QueryWriteStatus(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return runtime.HandleError(err)
+		s, ok := v.(string)
+		if !ok {
+			continue
 		}
-
-		marshaled, err = (protojson.MarshalOptions{UseProtoNames: true, EmitDefaultValues: true}).Marshal(resp.Msg)
-		if err != nil {
-			return nil, err
+		trim := strings.TrimSpace(s)
+		if trim == "" || !(strings.HasPrefix(trim, "{") || strings.HasPrefix(trim, "[")) {
+			continue
 		}
-		return mcp.NewToolResultText(string(marshaled)), nil
-	})
+		var parsed any
+		if err := json.Unmarshal([]byte(trim), &parsed); err != nil {
+			continue // ignore if it's not valid JSON
+		}
+		m[k] = parsed
+		changed = true
+	}
+	return changed
 }
 
 // ForwardToByteStreamClient registers a gRPC client, to forward MCP calls to it.
@@ -208,6 +231,9 @@ func ForwardToByteStreamClient(s *mcpserver.MCPServer, client ByteStreamClient, 
 		var req bytestream.QueryWriteStatusRequest
 
 		message := request.GetArguments()
+
+		// Limit to the "kind" oneof (optional). If you omit it, all oneofs are considered.
+		_ = ByteStreamNormalizeTopLevelJSONStringsForOneofs(message, &req, "kind")
 
 		// Extract extra properties if configured
 		for _, prop := range config.ExtraProperties {

@@ -3,7 +3,6 @@ module github.com/shaders/protoc-gen-go-mcp
 go 1.23.5
 
 require (
-	connectrpc.com/connect v1.18.1
 	github.com/mark3labs/mcp-go v0.37.0
 	github.com/onsi/gomega v1.37.0
 	github.com/openai/openai-go v1.5.0
@@ -12,11 +11,12 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20250218202821-56aae31c358a
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250212204824-5a70512c5d8b
 	google.golang.org/grpc v1.67.1
-	google.golang.org/protobuf v1.36.6
+	google.golang.org/protobuf v1.36.9
 )
 
 require (
 	buf.build/gen/go/redpandadata/common/protocolbuffers/go v1.34.2-20240917150400-3f349e63f44a.2 // indirect
+	connectrpc.com/connect v1.16.1 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect

@@ -20,7 +20,6 @@ import (
 
 	"github.com/mark3labs/mcp-go/server"
 	testdata "github.com/shaders/protoc-gen-go-mcp/pkg/testdata/gen/go/testdata"
-	"github.com/shaders/protoc-gen-go-mcp/pkg/testdata/gen/go/testdata/testdataconnect"
 	"github.com/shaders/protoc-gen-go-mcp/pkg/testdata/gen/go/testdata/testdatamcp"
 )
 
@@ -28,12 +27,6 @@ import (
 var (
 	grpcClient testdata.TestServiceClient
 	_          = testdatamcp.TestServiceClient(grpcClient)
-)
-
-// Ensure our interface and the official connect-go interface are compatible
-var (
-	connectClient testdataconnect.TestServiceClient
-	_             = testdatamcp.ConnectTestServiceClient(connectClient)
 )
 
 func main() {
@@ -50,7 +43,6 @@ func main() {
 	fmt.Printf("Using OpenAI-compatible MCP handlers\n")
 	testdatamcp.RegisterTestServiceHandlerOpenAI(s, &srv)
 
-	testdatamcp.ForwardToConnectTestServiceClient(s, connectClient)
 	testdatamcp.ForwardToTestServiceClient(s, grpcClient)
 
 	if err := server.ServeStdio(s); err != nil {

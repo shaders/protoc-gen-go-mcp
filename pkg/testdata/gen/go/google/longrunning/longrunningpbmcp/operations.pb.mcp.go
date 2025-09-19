@@ -9,7 +9,6 @@ import (
 )
 
 import (
-	"connectrpc.com/connect"
 	"context"
 	"encoding/json"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -17,6 +16,9 @@ import (
 	"github.com/shaders/protoc-gen-go-mcp/pkg/runtime"
 	grpc "google.golang.org/grpc"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"strings"
 )
 
 var (
@@ -478,211 +480,76 @@ type OperationsClient interface {
 	WaitOperation(ctx context.Context, req *longrunningpb.WaitOperationRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
 }
 
-// ConnectOperationsClient is compatible with the connectrpc-go client interface.
-type ConnectOperationsClient interface {
-	CancelOperation(ctx context.Context, req *connect.Request[longrunningpb.CancelOperationRequest]) (*connect.Response[emptypb.Empty], error)
-	DeleteOperation(ctx context.Context, req *connect.Request[longrunningpb.DeleteOperationRequest]) (*connect.Response[emptypb.Empty], error)
-	GetOperation(ctx context.Context, req *connect.Request[longrunningpb.GetOperationRequest]) (*connect.Response[longrunningpb.Operation], error)
-	ListOperations(ctx context.Context, req *connect.Request[longrunningpb.ListOperationsRequest]) (*connect.Response[longrunningpb.ListOperationsResponse], error)
-	WaitOperation(ctx context.Context, req *connect.Request[longrunningpb.WaitOperationRequest]) (*connect.Response[longrunningpb.Operation], error)
-}
-
-// ForwardToConnectOperationsClient registers a connectrpc client, to forward MCP calls to it.
-func ForwardToConnectOperationsClient(s *mcpserver.MCPServer, client ConnectOperationsClient, opts ...runtime.Option) {
-	config := runtime.NewConfig()
-	for _, opt := range opts {
-		opt(config)
-	}
-	CancelOperationTool := Operations_CancelOperationTool
-	// Add extra properties to schema if configured
-	if len(config.ExtraProperties) > 0 {
-		CancelOperationTool = runtime.AddExtraPropertiesToTool(CancelOperationTool, config.ExtraProperties)
+// TODO: BUG: https://github.com/anthropics/claude-code/issues/3084
+// OperationsNormalizeTopLevelJSONStringsForOneofs scans m's top level and, for keys that are members
+// of any (or selected) oneof(s) in the given proto message type, it will parse string values
+// that look like JSON and replace them with the parsed value.
+// If oneofNames is empty, all oneofs are considered. Otherwise only the named oneofs are used.
+func OperationsNormalizeTopLevelJSONStringsForOneofs(
+	m map[string]interface{},
+	msg proto.Message,
+	oneofNames ...string,
+) (changed bool) {
+	if m == nil || msg == nil {
+		return false
 	}
 
-	s.AddTool(CancelOperationTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		var req longrunningpb.CancelOperationRequest
-
-		message := request.GetArguments()
-
-		// Extract extra properties if configured
-		for _, prop := range config.ExtraProperties {
-			if propVal, ok := message[prop.Name]; ok {
-				ctx = context.WithValue(ctx, prop.ContextKey, propVal)
+	md := msg.ProtoReflect().Descriptor()
+	// Build a set of target oneof descriptors
+	var targetOneofs map[protoreflect.OneofDescriptor]struct{}
+	if len(oneofNames) > 0 {
+		targetOneofs = map[protoreflect.OneofDescriptor]struct{}{}
+	outer:
+		for i := 0; i < md.Oneofs().Len(); i++ {
+			od := md.Oneofs().Get(i)
+			for _, name := range oneofNames {
+				if string(od.Name()) == name {
+					targetOneofs[od] = struct{}{}
+					continue outer
+				}
 			}
 		}
-
-		marshaled, err := json.Marshal(message)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(marshaled, &req); err != nil {
-			return nil, err
-		}
-
-		resp, err := client.CancelOperation(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return runtime.HandleError(err)
-		}
-
-		marshaled, err = (protojson.MarshalOptions{UseProtoNames: true, EmitDefaultValues: true}).Marshal(resp.Msg)
-		if err != nil {
-			return nil, err
-		}
-		return mcp.NewToolResultText(string(marshaled)), nil
-	})
-	DeleteOperationTool := Operations_DeleteOperationTool
-	// Add extra properties to schema if configured
-	if len(config.ExtraProperties) > 0 {
-		DeleteOperationTool = runtime.AddExtraPropertiesToTool(DeleteOperationTool, config.ExtraProperties)
 	}
 
-	s.AddTool(DeleteOperationTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		var req longrunningpb.DeleteOperationRequest
-
-		message := request.GetArguments()
-
-		// Extract extra properties if configured
-		for _, prop := range config.ExtraProperties {
-			if propVal, ok := message[prop.Name]; ok {
-				ctx = context.WithValue(ctx, prop.ContextKey, propVal)
+	// Collect JSON names of fields that belong to the target oneof(s)
+	jsonNames := map[string]struct{}{}
+	for i := 0; i < md.Fields().Len(); i++ {
+		fd := md.Fields().Get(i)
+		if fd.ContainingOneof() == nil {
+			continue
+		}
+		if targetOneofs != nil {
+			if _, ok := targetOneofs[fd.ContainingOneof()]; !ok {
+				continue
 			}
 		}
-
-		marshaled, err := json.Marshal(message)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(marshaled, &req); err != nil {
-			return nil, err
-		}
-
-		resp, err := client.DeleteOperation(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return runtime.HandleError(err)
-		}
-
-		marshaled, err = (protojson.MarshalOptions{UseProtoNames: true, EmitDefaultValues: true}).Marshal(resp.Msg)
-		if err != nil {
-			return nil, err
-		}
-		return mcp.NewToolResultText(string(marshaled)), nil
-	})
-	GetOperationTool := Operations_GetOperationTool
-	// Add extra properties to schema if configured
-	if len(config.ExtraProperties) > 0 {
-		GetOperationTool = runtime.AddExtraPropertiesToTool(GetOperationTool, config.ExtraProperties)
+		// fd.JSONName() is the canonical JSON field name ("cat", "dog", ...)
+		jsonNames[fd.JSONName()] = struct{}{}
+		// Also consider the proto field name in case your map uses snake_case
+		jsonNames[string(fd.Name())] = struct{}{}
 	}
 
-	s.AddTool(GetOperationTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		var req longrunningpb.GetOperationRequest
-
-		message := request.GetArguments()
-
-		// Extract extra properties if configured
-		for _, prop := range config.ExtraProperties {
-			if propVal, ok := message[prop.Name]; ok {
-				ctx = context.WithValue(ctx, prop.ContextKey, propVal)
-			}
+	// Rewrite top-level stringified JSON for those keys
+	for k, v := range m {
+		if _, ok := jsonNames[k]; !ok {
+			continue
 		}
-
-		marshaled, err := json.Marshal(message)
-		if err != nil {
-			return nil, err
+		s, ok := v.(string)
+		if !ok {
+			continue
 		}
-
-		if err := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(marshaled, &req); err != nil {
-			return nil, err
+		trim := strings.TrimSpace(s)
+		if trim == "" || !(strings.HasPrefix(trim, "{") || strings.HasPrefix(trim, "[")) {
+			continue
 		}
-
-		resp, err := client.GetOperation(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return runtime.HandleError(err)
+		var parsed any
+		if err := json.Unmarshal([]byte(trim), &parsed); err != nil {
+			continue // ignore if it's not valid JSON
 		}
-
-		marshaled, err = (protojson.MarshalOptions{UseProtoNames: true, EmitDefaultValues: true}).Marshal(resp.Msg)
-		if err != nil {
-			return nil, err
-		}
-		return mcp.NewToolResultText(string(marshaled)), nil
-	})
-	ListOperationsTool := Operations_ListOperationsTool
-	// Add extra properties to schema if configured
-	if len(config.ExtraProperties) > 0 {
-		ListOperationsTool = runtime.AddExtraPropertiesToTool(ListOperationsTool, config.ExtraProperties)
+		m[k] = parsed
+		changed = true
 	}
-
-	s.AddTool(ListOperationsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		var req longrunningpb.ListOperationsRequest
-
-		message := request.GetArguments()
-
-		// Extract extra properties if configured
-		for _, prop := range config.ExtraProperties {
-			if propVal, ok := message[prop.Name]; ok {
-				ctx = context.WithValue(ctx, prop.ContextKey, propVal)
-			}
-		}
-
-		marshaled, err := json.Marshal(message)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(marshaled, &req); err != nil {
-			return nil, err
-		}
-
-		resp, err := client.ListOperations(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return runtime.HandleError(err)
-		}
-
-		marshaled, err = (protojson.MarshalOptions{UseProtoNames: true, EmitDefaultValues: true}).Marshal(resp.Msg)
-		if err != nil {
-			return nil, err
-		}
-		return mcp.NewToolResultText(string(marshaled)), nil
-	})
-	WaitOperationTool := Operations_WaitOperationTool
-	// Add extra properties to schema if configured
-	if len(config.ExtraProperties) > 0 {
-		WaitOperationTool = runtime.AddExtraPropertiesToTool(WaitOperationTool, config.ExtraProperties)
-	}
-
-	s.AddTool(WaitOperationTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		var req longrunningpb.WaitOperationRequest
-
-		message := request.GetArguments()
-
-		// Extract extra properties if configured
-		for _, prop := range config.ExtraProperties {
-			if propVal, ok := message[prop.Name]; ok {
-				ctx = context.WithValue(ctx, prop.ContextKey, propVal)
-			}
-		}
-
-		marshaled, err := json.Marshal(message)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(marshaled, &req); err != nil {
-			return nil, err
-		}
-
-		resp, err := client.WaitOperation(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return runtime.HandleError(err)
-		}
-
-		marshaled, err = (protojson.MarshalOptions{UseProtoNames: true, EmitDefaultValues: true}).Marshal(resp.Msg)
-		if err != nil {
-			return nil, err
-		}
-		return mcp.NewToolResultText(string(marshaled)), nil
-	})
+	return changed
 }
 
 // ForwardToOperationsClient registers a gRPC client, to forward MCP calls to it.
@@ -701,6 +568,9 @@ func ForwardToOperationsClient(s *mcpserver.MCPServer, client OperationsClient, 
 		var req longrunningpb.CancelOperationRequest
 
 		message := request.GetArguments()
+
+		// Limit to the "kind" oneof (optional). If you omit it, all oneofs are considered.
+		_ = OperationsNormalizeTopLevelJSONStringsForOneofs(message, &req, "kind")
 
 		// Extract extra properties if configured
 		for _, prop := range config.ExtraProperties {
@@ -740,6 +610,9 @@ func ForwardToOperationsClient(s *mcpserver.MCPServer, client OperationsClient, 
 
 		message := request.GetArguments()
 
+		// Limit to the "kind" oneof (optional). If you omit it, all oneofs are considered.
+		_ = OperationsNormalizeTopLevelJSONStringsForOneofs(message, &req, "kind")
+
 		// Extract extra properties if configured
 		for _, prop := range config.ExtraProperties {
 			if propVal, ok := message[prop.Name]; ok {
@@ -777,6 +650,9 @@ func ForwardToOperationsClient(s *mcpserver.MCPServer, client OperationsClient, 
 		var req longrunningpb.GetOperationRequest
 
 		message := request.GetArguments()
+
+		// Limit to the "kind" oneof (optional). If you omit it, all oneofs are considered.
+		_ = OperationsNormalizeTopLevelJSONStringsForOneofs(message, &req, "kind")
 
 		// Extract extra properties if configured
 		for _, prop := range config.ExtraProperties {
@@ -816,6 +692,9 @@ func ForwardToOperationsClient(s *mcpserver.MCPServer, client OperationsClient, 
 
 		message := request.GetArguments()
 
+		// Limit to the "kind" oneof (optional). If you omit it, all oneofs are considered.
+		_ = OperationsNormalizeTopLevelJSONStringsForOneofs(message, &req, "kind")
+
 		// Extract extra properties if configured
 		for _, prop := range config.ExtraProperties {
 			if propVal, ok := message[prop.Name]; ok {
@@ -853,6 +732,9 @@ func ForwardToOperationsClient(s *mcpserver.MCPServer, client OperationsClient, 
 		var req longrunningpb.WaitOperationRequest
 
 		message := request.GetArguments()
+
+		// Limit to the "kind" oneof (optional). If you omit it, all oneofs are considered.
+		_ = OperationsNormalizeTopLevelJSONStringsForOneofs(message, &req, "kind")
 
 		// Extract extra properties if configured
 		for _, prop := range config.ExtraProperties {

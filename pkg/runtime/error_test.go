@@ -5,7 +5,6 @@ import (
 	"errors"
 	"testing"
 
-	"connectrpc.com/connect"
 	"github.com/mark3labs/mcp-go/mcp"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
@@ -108,36 +107,6 @@ func TestHandleError_GRPCStatus(t *testing.T) {
 		} else {
 			t.Error("Expected value field in error details")
 		}
-	}
-}
-
-func TestHandleError_ConnectError(t *testing.T) {
-	// Create a Connect error
-	connectErr := connect.NewError(connect.CodeInvalidArgument, errors.New("connect error"))
-
-	result, handleErr := HandleError(connectErr)
-
-	if handleErr != nil {
-		t.Fatalf("HandleError should not return an error, got: %v", handleErr)
-	}
-
-	if result == nil {
-		t.Fatal("HandleError should return a result")
-	}
-
-	// Parse the JSON error response
-	textContent := result.Content[0].(mcp.TextContent)
-	var errorResp map[string]interface{}
-	if jsonErr := json.Unmarshal([]byte(textContent.Text), &errorResp); jsonErr != nil {
-		t.Fatalf("Failed to parse error JSON: %v", jsonErr)
-	}
-
-	if errorResp["code"] != "INVALID_ARGUMENT" {
-		t.Errorf("Expected code 'INVALID_ARGUMENT', got: %s", errorResp["code"])
-	}
-
-	if errorResp["message"] != "connect error" {
-		t.Errorf("Expected message 'connect error', got: %s", errorResp["message"])
 	}
 }
 

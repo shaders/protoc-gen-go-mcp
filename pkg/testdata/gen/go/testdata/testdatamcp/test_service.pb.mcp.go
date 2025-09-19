@@ -9,13 +9,15 @@ import (
 
 import (
 	"context"
+	"strings"
 	"github.com/mark3labs/mcp-go/mcp"
 	mcpserver "github.com/mark3labs/mcp-go/server"
 	"encoding/json"
 	"google.golang.org/protobuf/encoding/protojson"
-	"connectrpc.com/connect"
 	grpc "google.golang.org/grpc"
 	"github.com/shaders/protoc-gen-go-mcp/pkg/runtime"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 var (
@@ -309,133 +311,76 @@ type TestServiceClient interface {
 	ProcessWellKnownTypes(ctx context.Context, req *testdata.ProcessWellKnownTypesRequest, opts ...grpc.CallOption) (*testdata.ProcessWellKnownTypesResponse, error)
 }
 
-// ConnectTestServiceClient is compatible with the connectrpc-go client interface.
-type ConnectTestServiceClient interface {
-	CreateItem(ctx context.Context, req *connect.Request[testdata.CreateItemRequest]) (*connect.Response[testdata.CreateItemResponse], error)
-	GetItem(ctx context.Context, req *connect.Request[testdata.GetItemRequest]) (*connect.Response[testdata.GetItemResponse], error)
-	ProcessWellKnownTypes(ctx context.Context, req *connect.Request[testdata.ProcessWellKnownTypesRequest]) (*connect.Response[testdata.ProcessWellKnownTypesResponse], error)
-}
-
-// ForwardToConnectTestServiceClient registers a connectrpc client, to forward MCP calls to it.
-func ForwardToConnectTestServiceClient(s *mcpserver.MCPServer, client ConnectTestServiceClient, opts ...runtime.Option) {
-	config := runtime.NewConfig()
-	for _, opt := range opts {
-		opt(config)
-	}
-	CreateItemTool := TestService_CreateItemTool
-	// Add extra properties to schema if configured
-	if len(config.ExtraProperties) > 0 {
-		CreateItemTool = runtime.AddExtraPropertiesToTool(CreateItemTool, config.ExtraProperties)
+// TODO: BUG: https://github.com/anthropics/claude-code/issues/3084
+// TestServiceNormalizeTopLevelJSONStringsForOneofs scans m's top level and, for keys that are members
+// of any (or selected) oneof(s) in the given proto message type, it will parse string values
+// that look like JSON and replace them with the parsed value.
+// If oneofNames is empty, all oneofs are considered. Otherwise only the named oneofs are used.
+func TestServiceNormalizeTopLevelJSONStringsForOneofs(
+	m map[string]interface{},
+	msg proto.Message,
+	oneofNames ...string,
+) (changed bool) {
+	if m == nil || msg == nil {
+		return false
 	}
 
-	s.AddTool(CreateItemTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		var req testdata.CreateItemRequest
-
-		message := request.GetArguments()
-
-		// Extract extra properties if configured
-		for _, prop := range config.ExtraProperties {
-			if propVal, ok := message[prop.Name]; ok {
-				ctx = context.WithValue(ctx, prop.ContextKey, propVal)
+	md := msg.ProtoReflect().Descriptor()
+	// Build a set of target oneof descriptors
+	var targetOneofs map[protoreflect.OneofDescriptor]struct{}
+	if len(oneofNames) > 0 {
+		targetOneofs = map[protoreflect.OneofDescriptor]struct{}{}
+	outer:
+		for i := 0; i < md.Oneofs().Len(); i++ {
+			od := md.Oneofs().Get(i)
+			for _, name := range oneofNames {
+				if string(od.Name()) == name {
+					targetOneofs[od] = struct{}{}
+					continue outer
+				}
 			}
 		}
-
-		marshaled, err := json.Marshal(message)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(marshaled, &req); err != nil {
-			return nil, err
-		}
-
-		resp, err := client.CreateItem(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return runtime.HandleError(err)
-		}
-
-		marshaled, err = (protojson.MarshalOptions{UseProtoNames: true, EmitDefaultValues: true}).Marshal(resp.Msg)
-		if err != nil {
-			return nil, err
-		}
-		return mcp.NewToolResultText(string(marshaled)), nil
-	})
-	GetItemTool := TestService_GetItemTool
-	// Add extra properties to schema if configured
-	if len(config.ExtraProperties) > 0 {
-		GetItemTool = runtime.AddExtraPropertiesToTool(GetItemTool, config.ExtraProperties)
 	}
 
-	s.AddTool(GetItemTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		var req testdata.GetItemRequest
-
-		message := request.GetArguments()
-
-		// Extract extra properties if configured
-		for _, prop := range config.ExtraProperties {
-			if propVal, ok := message[prop.Name]; ok {
-				ctx = context.WithValue(ctx, prop.ContextKey, propVal)
+	// Collect JSON names of fields that belong to the target oneof(s)
+	jsonNames := map[string]struct{}{}
+	for i := 0; i < md.Fields().Len(); i++ {
+		fd := md.Fields().Get(i)
+		if fd.ContainingOneof() == nil {
+			continue
+		}
+		if targetOneofs != nil {
+			if _, ok := targetOneofs[fd.ContainingOneof()]; !ok {
+				continue
 			}
 		}
-
-		marshaled, err := json.Marshal(message)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(marshaled, &req); err != nil {
-			return nil, err
-		}
-
-		resp, err := client.GetItem(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return runtime.HandleError(err)
-		}
-
-		marshaled, err = (protojson.MarshalOptions{UseProtoNames: true, EmitDefaultValues: true}).Marshal(resp.Msg)
-		if err != nil {
-			return nil, err
-		}
-		return mcp.NewToolResultText(string(marshaled)), nil
-	})
-	ProcessWellKnownTypesTool := TestService_ProcessWellKnownTypesTool
-	// Add extra properties to schema if configured
-	if len(config.ExtraProperties) > 0 {
-		ProcessWellKnownTypesTool = runtime.AddExtraPropertiesToTool(ProcessWellKnownTypesTool, config.ExtraProperties)
+		// fd.JSONName() is the canonical JSON field name ("cat", "dog", ...)
+		jsonNames[fd.JSONName()] = struct{}{}
+		// Also consider the proto field name in case your map uses snake_case
+		jsonNames[string(fd.Name())] = struct{}{}
 	}
 
-	s.AddTool(ProcessWellKnownTypesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		var req testdata.ProcessWellKnownTypesRequest
-
-		message := request.GetArguments()
-
-		// Extract extra properties if configured
-		for _, prop := range config.ExtraProperties {
-			if propVal, ok := message[prop.Name]; ok {
-				ctx = context.WithValue(ctx, prop.ContextKey, propVal)
-			}
+	// Rewrite top-level stringified JSON for those keys
+	for k, v := range m {
+		if _, ok := jsonNames[k]; !ok {
+			continue
 		}
-
-		marshaled, err := json.Marshal(message)
-		if err != nil {
-			return nil, err
+		s, ok := v.(string)
+		if !ok {
+			continue
 		}
-
-		if err := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(marshaled, &req); err != nil {
-			return nil, err
+		trim := strings.TrimSpace(s)
+		if trim == "" || !(strings.HasPrefix(trim, "{") || strings.HasPrefix(trim, "[")) {
+			continue
 		}
-
-		resp, err := client.ProcessWellKnownTypes(ctx, connect.NewRequest(&req))
-		if err != nil {
-			return runtime.HandleError(err)
+		var parsed any
+		if err := json.Unmarshal([]byte(trim), &parsed); err != nil {
+			continue // ignore if it's not valid JSON
 		}
-
-		marshaled, err = (protojson.MarshalOptions{UseProtoNames: true, EmitDefaultValues: true}).Marshal(resp.Msg)
-		if err != nil {
-			return nil, err
-		}
-		return mcp.NewToolResultText(string(marshaled)), nil
-	})
+		m[k] = parsed
+		changed = true
+	}
+	return changed
 }
 
 // ForwardToTestServiceClient registers a gRPC client, to forward MCP calls to it.
@@ -454,6 +399,9 @@ func ForwardToTestServiceClient(s *mcpserver.MCPServer, client TestServiceClient
 		var req testdata.CreateItemRequest
 
 		message := request.GetArguments()
+
+		// Limit to the "kind" oneof (optional). If you omit it, all oneofs are considered.
+		_ = TestServiceNormalizeTopLevelJSONStringsForOneofs(message, &req, "kind")
 
 		// Extract extra properties if configured
 		for _, prop := range config.ExtraProperties {
@@ -493,6 +441,9 @@ func ForwardToTestServiceClient(s *mcpserver.MCPServer, client TestServiceClient
 
 		message := request.GetArguments()
 
+		// Limit to the "kind" oneof (optional). If you omit it, all oneofs are considered.
+		_ = TestServiceNormalizeTopLevelJSONStringsForOneofs(message, &req, "kind")
+
 		// Extract extra properties if configured
 		for _, prop := range config.ExtraProperties {
 			if propVal, ok := message[prop.Name]; ok {
@@ -530,6 +481,9 @@ func ForwardToTestServiceClient(s *mcpserver.MCPServer, client TestServiceClient
 		var req testdata.ProcessWellKnownTypesRequest
 
 		message := request.GetArguments()
+
+		// Limit to the "kind" oneof (optional). If you omit it, all oneofs are considered.
+		_ = TestServiceNormalizeTopLevelJSONStringsForOneofs(message, &req, "kind")
 
 		// Extract extra properties if configured
 		for _, prop := range config.ExtraProperties {

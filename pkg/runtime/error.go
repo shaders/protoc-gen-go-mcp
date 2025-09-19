@@ -15,9 +15,6 @@
 package runtime
 
 import (
-	"errors"
-
-	"connectrpc.com/connect"
 	"github.com/mark3labs/mcp-go/mcp"
 	apierrors "github.com/redpanda-data/common-go/api/errors"
 	spb "google.golang.org/genproto/googleapis/rpc/status"
@@ -26,22 +23,19 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-// HandleError converts a gRPC/Connect error into a structured MCP tool result
+// HandleError converts a gRPC error into a structured MCP tool result
 // It extracts error codes, messages, and detailed error information using common-go utilities
 func HandleError(err error) (*mcp.CallToolResult, error) {
 	if err == nil {
 		return nil, nil
 	}
 
-	// Convert to google.rpc.Status regardless of source
+	// Convert to google.rpc.Status
 	var statusProto *spb.Status
 
 	// Try to extract gRPC status first
 	if st, ok := status.FromError(err); ok {
 		statusProto = st.Proto()
-	} else if connectErr := new(connect.Error); errors.As(err, &connectErr) {
-		// Handle Connect RPC errors using ConnectErrorToGoogleStatus
-		statusProto = apierrors.ConnectErrorToGoogleStatus(connectErr)
 	} else {
 		// Create a basic status for generic errors
 		statusProto = &spb.Status{

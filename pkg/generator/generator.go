@@ -65,7 +65,6 @@ import (
   mcpserver "github.com/mark3labs/mcp-go/server"
   "encoding/json"
   "google.golang.org/protobuf/encoding/protojson"
-  "connectrpc.com/connect"
   grpc "google.golang.org/grpc"
   "github.com/shaders/protoc-gen-go-mcp/pkg/runtime"
   "google.golang.org/protobuf/proto"
@@ -217,14 +216,6 @@ type {{$serviceName}}Client interface {
 {{ end }}
 
 
-{{- range $serviceName, $methods := .Services }}
-// Connect{{$serviceName}}Client is compatible with the connectrpc-go client interface.
-type Connect{{$serviceName}}Client interface {
-  {{- range $methodName, $tool := $methods }}
-  {{$methodName}}(ctx context.Context, req *connect.Request[{{$tool.RequestType}}]) (*connect.Response[{{$tool.ResponseType}}], error)
-  {{- end }}
-}
-{{ end }}
 
 {{- range $serviceName, $methods := .Services }}
 // TODO: BUG: https://github.com/anthropics/claude-code/issues/3084
@@ -300,56 +291,6 @@ func {{$serviceName}}NormalizeTopLevelJSONStringsForOneofs(
 }
 {{- end }}
 
-{{- range $key, $val := .Services }}
-// ForwardToConnect{{$key}}Client registers a connectrpc client, to forward MCP calls to it.
-func ForwardToConnect{{$key}}Client(s *mcpserver.MCPServer, client Connect{{$key}}Client, opts ...runtime.Option) {
-  config := runtime.NewConfig()
-  for _, opt := range opts {
-    opt(config)
-  }
-
-  {{- range $tool_name, $tool_val := $val }}
-  {{$tool_name}}Tool := {{$key | capitalizeFirst}}_{{$tool_name}}Tool
-  // Add extra properties to schema if configured
-  if len(config.ExtraProperties) > 0 {
-    {{$tool_name}}Tool = runtime.AddExtraPropertiesToTool({{$tool_name}}Tool, config.ExtraProperties)
-  }
-  
-  s.AddTool({{$tool_name}}Tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-    var req {{$tool_val.RequestType}}
-
-    message := request.GetArguments()
-
-    // Extract extra properties if configured
-    for _, prop := range config.ExtraProperties {
-      if propVal, ok := message[prop.Name]; ok {
-        ctx = context.WithValue(ctx, prop.ContextKey, propVal)
-      }
-    }
-
-    marshaled, err := json.Marshal(message)
-    if err != nil {
-      return nil, err
-    }
-
-    if err := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(marshaled, &req); err != nil {
-      return nil, err
-    }
-
-    resp, err := client.{{$tool_name}}(ctx, connect.NewRequest(&req))
-    if err != nil {
-      return runtime.HandleError(err)
-    }
-
-    marshaled, err = (protojson.MarshalOptions{UseProtoNames: true, EmitDefaultValues: true}).Marshal(resp.Msg)
-    if err != nil {
-      return nil, err
-    }
-    return mcp.NewToolResultText(string(marshaled)), nil
-  })
-  {{- end }}
-}
-{{- end }}
 
 {{- range $key, $val := .Services }}
 // ForwardTo{{$key}}Client registers a gRPC client, to forward MCP calls to it.
