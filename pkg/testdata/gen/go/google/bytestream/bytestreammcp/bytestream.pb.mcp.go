@@ -28,7 +28,7 @@ type Tool struct {
 }
 
 var (
-	ByteStream_QueryWriteStatusTool = Tool{Name: "google_bytestream_ByteStream_QueryWriteStatus", Description: "`QueryWriteStatus()` is used to find the `committed_size` for a resource\nthat is being written, which can then be used as the `write_offset` for\nthe next `Write()` call.\n\nIf the resource does not exist (i.e., the resource has been deleted, or the\nfirst `Write()` has not yet reached the service), this method returns the\nerror `NOT_FOUND`.\n\nThe client **may** call `QueryWriteStatus()` at any time to determine how\nmuch data has been processed for this resource. This is useful if the\nclient is buffering data and needs to know which data can be safely\nevicted. For any sequence of `QueryWriteStatus()` calls for a given\nresource name, the sequence of returned `committed_size` values will be\nnon-decreasing.\n", JSONSchema: "{\"properties\":{\"resource_name\":{\"description\":\"The name of the resource whose write status is being requested.\",\"type\":\"string\"}},\"required\":[],\"type\":\"object\"}"}
+	ByteStream_QueryWriteStatusTool = Tool{Name: "google_bytestream_ByteStream_QueryWriteStatus", Description: "`QueryWriteStatus()` is used to find the `committed_size` for a resource\nthat is being written, which can then be used as the `write_offset` for\nthe next `Write()` call.\n\nIf the resource does not exist (i.e., the resource has been deleted, or the\nfirst `Write()` has not yet reached the service), this method returns the\nerror `NOT_FOUND`.\n\nThe client **may** call `QueryWriteStatus()` at any time to determine how\nmuch data has been processed for this resource. This is useful if the\nclient is buffering data and needs to know which data can be safely\nevicted. For any sequence of `QueryWriteStatus()` calls for a given\nresource name, the sequence of returned `committed_size` values will be\nnon-decreasing.\n", JSONSchema: "{\"additionalProperties\":false,\"properties\":{\"resource_name\":{\"description\":\"The name of the resource whose write status is being requested.\",\"type\":\"string\"}},\"required\":[],\"type\":\"object\"}"}
 )
 
 // ByteStreamClient is compatible with the grpc-go client interface.
@@ -119,17 +119,23 @@ func ByteStreamTransformOneOfFieldsRecursive(obj interface{}) {
 	case map[string]interface{}:
 		// Transform oneOf fields in this object
 		for key, value := range v {
-			// Check if this looks like a oneOf discriminated union
-			if unionObj, ok := value.(map[string]interface{}); ok {
-				if typeField, hasType := unionObj["type"]; hasType {
-					if typeStr, ok := typeField.(string); ok {
-						// This is a discriminated union, transform it
-						// Remove the "type" field and move other properties up
-						delete(unionObj, "type")
+			// Check if this looks like a oneOf discriminated union (must have OneOfType postfix)
+			if strings.HasSuffix(key, "OneOfType") {
+				if unionObj, ok := value.(map[string]interface{}); ok {
+					if typeField, hasType := unionObj["type"]; hasType {
+						if typeStr, ok := typeField.(string); ok {
+							// Create a new object without the type field
+							variantObj := make(map[string]interface{})
+							for k, val := range unionObj {
+								if k != "type" {
+									variantObj[k] = val
+								}
+							}
 
-						// Replace the union object with the variant object
-						v[typeStr] = unionObj
-						delete(v, key)
+							// Replace the union object with the variant object
+							v[typeStr] = variantObj
+							delete(v, key)
+						}
 					}
 				}
 			}

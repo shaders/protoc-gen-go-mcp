@@ -28,9 +28,9 @@ type Tool struct {
 }
 
 var (
-	TestService_CreateItemTool            = Tool{Name: "testdata_TestService_CreateItem", Description: "CreateItem creates a new item\n", JSONSchema: "{\"properties\":{\"description\":{\"description\":\"Optional field\",\"type\":\"string\"},\"item_type\":{\"oneOf\":[{\"properties\":{\"price\":{\"description\":\"Product price in dollars\",\"type\":\"number\"},\"quantity\":{\"description\":\"Available quantity\",\"type\":\"integer\"},\"type\":{\"const\":\"product\",\"type\":\"string\"}},\"required\":[\"type\"],\"title\":\"product\",\"type\":\"object\"},{\"properties\":{\"duration\":{\"description\":\"Service duration (e.g. \\\"1h\\\", \\\"30m\\\")\",\"type\":\"string\"},\"recurring\":{\"description\":\"Whether this is a recurring service\",\"type\":\"boolean\"},\"type\":{\"const\":\"service\",\"type\":\"string\"}},\"required\":[\"type\"],\"title\":\"service\",\"type\":\"object\"}]},\"labels\":{\"additionalProperties\":{\"type\":\"string\"},\"description\":\"Map field\",\"propertyNames\":{\"type\":\"string\"},\"type\":\"object\"},\"name\":{\"description\":\"Required field\",\"type\":\"string\"},\"tags\":{\"description\":\"Repeated field\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"thumbnail\":{\"contentEncoding\":\"base64\",\"description\":\"Bytes field\",\"format\":\"byte\",\"type\":\"string\"}},\"required\":[\"name\"],\"type\":\"object\"}"}
-	TestService_GetItemTool               = Tool{Name: "testdata_TestService_GetItem", Description: "GetItem retrieves an item by ID\n", JSONSchema: "{\"properties\":{\"id\":{\"type\":\"string\"}},\"required\":[],\"type\":\"object\"}"}
-	TestService_ProcessWellKnownTypesTool = Tool{Name: "testdata_TestService_ProcessWellKnownTypes", Description: "Test well-known types handling\n", JSONSchema: "{\"properties\":{\"config\":{\"description\":\"represents a google.protobuf.Value, a dynamic JSON value (string, number, boolean, array, object).\"},\"metadata\":{\"additionalProperties\":true,\"description\":\"Well-known types that need special handling\",\"type\":\"object\"},\"payload\":{\"properties\":{\"@type\":{\"type\":\"string\"},\"value\":{}},\"required\":[\"@type\"],\"type\":[\"object\",\"null\"]},\"timestamp\":{\"format\":\"date-time\",\"type\":[\"string\",\"null\"]}},\"required\":[],\"type\":\"object\"}"}
+	TestService_CreateItemTool            = Tool{Name: "testdata_TestService_CreateItem", Description: "CreateItem creates a new item\n", JSONSchema: "{\"additionalProperties\":false,\"properties\":{\"description\":{\"description\":\"Optional field\",\"type\":\"string\"},\"item_typeOneOfType\":{\"oneOf\":[{\"additionalProperties\":false,\"properties\":{\"price\":{\"description\":\"Product price in dollars\",\"type\":\"number\"},\"quantity\":{\"description\":\"Available quantity\",\"type\":\"integer\"},\"type\":{\"const\":\"product\",\"type\":\"string\"}},\"required\":[\"type\"],\"title\":\"product\",\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"duration\":{\"description\":\"Service duration (e.g. \\\"1h\\\", \\\"30m\\\")\",\"type\":\"string\"},\"recurring\":{\"description\":\"Whether this is a recurring service\",\"type\":\"boolean\"},\"type\":{\"const\":\"service\",\"type\":\"string\"}},\"required\":[\"type\"],\"title\":\"service\",\"type\":\"object\"}]},\"labels\":{\"additionalProperties\":{\"type\":\"string\"},\"description\":\"Map field\",\"propertyNames\":{\"type\":\"string\"},\"type\":\"object\"},\"name\":{\"description\":\"Required field\",\"type\":\"string\"},\"tags\":{\"description\":\"Repeated field\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"thumbnail\":{\"contentEncoding\":\"base64\",\"description\":\"Bytes field\",\"format\":\"byte\",\"type\":\"string\"}},\"required\":[\"name\",\"item_typeOneOfType\"],\"type\":\"object\"}"}
+	TestService_GetItemTool               = Tool{Name: "testdata_TestService_GetItem", Description: "GetItem retrieves an item by ID\n", JSONSchema: "{\"additionalProperties\":false,\"properties\":{\"id\":{\"type\":\"string\"}},\"required\":[],\"type\":\"object\"}"}
+	TestService_ProcessWellKnownTypesTool = Tool{Name: "testdata_TestService_ProcessWellKnownTypes", Description: "Test well-known types handling\n", JSONSchema: "{\"additionalProperties\":false,\"properties\":{\"config\":{\"description\":\"represents a google.protobuf.Value, a dynamic JSON value (string, number, boolean, array, object).\"},\"metadata\":{\"additionalProperties\":true,\"description\":\"Well-known types that need special handling\",\"type\":\"object\"},\"payload\":{\"properties\":{\"@type\":{\"type\":\"string\"},\"value\":{}},\"required\":[\"@type\"],\"type\":[\"object\",\"null\"]},\"timestamp\":{\"format\":\"date-time\",\"type\":[\"string\",\"null\"]}},\"required\":[],\"type\":\"object\"}"}
 )
 
 // TestServiceClient is compatible with the grpc-go client interface.
@@ -123,17 +123,23 @@ func TestServiceTransformOneOfFieldsRecursive(obj interface{}) {
 	case map[string]interface{}:
 		// Transform oneOf fields in this object
 		for key, value := range v {
-			// Check if this looks like a oneOf discriminated union
-			if unionObj, ok := value.(map[string]interface{}); ok {
-				if typeField, hasType := unionObj["type"]; hasType {
-					if typeStr, ok := typeField.(string); ok {
-						// This is a discriminated union, transform it
-						// Remove the "type" field and move other properties up
-						delete(unionObj, "type")
+			// Check if this looks like a oneOf discriminated union (must have OneOfType postfix)
+			if strings.HasSuffix(key, "OneOfType") {
+				if unionObj, ok := value.(map[string]interface{}); ok {
+					if typeField, hasType := unionObj["type"]; hasType {
+						if typeStr, ok := typeField.(string); ok {
+							// Create a new object without the type field
+							variantObj := make(map[string]interface{})
+							for k, val := range unionObj {
+								if k != "type" {
+									variantObj[k] = val
+								}
+							}
 
-						// Replace the union object with the variant object
-						v[typeStr] = unionObj
-						delete(v, key)
+							// Replace the union object with the variant object
+							v[typeStr] = variantObj
+							delete(v, key)
+						}
 					}
 				}
 			}

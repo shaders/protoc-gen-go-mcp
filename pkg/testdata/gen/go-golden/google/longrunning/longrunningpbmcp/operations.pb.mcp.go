@@ -29,11 +29,11 @@ type Tool struct {
 }
 
 var (
-	Operations_CancelOperationTool = Tool{Name: "google_longrunning_Operations_CancelOperation", Description: "Starts asynchronous cancellation on a long-running operation.  The server\nmakes a best effort to cancel the operation, but success is not\nguaranteed.  If the server doesn't support this method, it returns\n`google.rpc.Code.UNIMPLEMENTED`.  Clients can use\n[Operations.GetOperation][google.longrunning.Operations.GetOperation] or\nother methods to check whether the cancellation succeeded or whether the\noperation completed despite cancellation. On successful cancellation,\nthe operation is not deleted; instead, it becomes an operation with\nan [Operation.error][google.longrunning.Operation.error] value with a\n[google.rpc.Status.code][google.rpc.Status.code] of `1`, corresponding to\n`Code.CANCELLED`.\n", JSONSchema: "{\"properties\":{\"name\":{\"description\":\"The name of the operation resource to be cancelled.\",\"type\":\"string\"}},\"required\":[],\"type\":\"object\"}"}
-	Operations_DeleteOperationTool = Tool{Name: "google_longrunning_Operations_DeleteOperation", Description: "Deletes a long-running operation. This method indicates that the client is\nno longer interested in the operation result. It does not cancel the\noperation. If the server doesn't support this method, it returns\n`google.rpc.Code.UNIMPLEMENTED`.\n", JSONSchema: "{\"properties\":{\"name\":{\"description\":\"The name of the operation resource to be deleted.\",\"type\":\"string\"}},\"required\":[],\"type\":\"object\"}"}
-	Operations_GetOperationTool    = Tool{Name: "google_longrunning_Operations_GetOperation", Description: "Gets the latest state of a long-running operation.  Clients can use this\nmethod to poll the operation result at intervals as recommended by the API\nservice.\n", JSONSchema: "{\"properties\":{\"name\":{\"description\":\"The name of the operation resource.\",\"type\":\"string\"}},\"required\":[],\"type\":\"object\"}"}
-	Operations_ListOperationsTool  = Tool{Name: "google_longrunning_Operations_ListOperations", Description: "Lists operations that match the specified filter in the request. If the\nserver doesn't support this method, it returns `UNIMPLEMENTED`.\n", JSONSchema: "{\"properties\":{\"filter\":{\"description\":\"The standard list filter.\",\"type\":\"string\"},\"name\":{\"description\":\"The name of the operation's parent resource.\",\"type\":\"string\"},\"page_size\":{\"description\":\"The standard list page size.\",\"type\":\"integer\"},\"page_token\":{\"description\":\"The standard list page token.\",\"type\":\"string\"}},\"required\":[],\"type\":\"object\"}"}
-	Operations_WaitOperationTool   = Tool{Name: "google_longrunning_Operations_WaitOperation", Description: "Waits until the specified long-running operation is done or reaches at most\na specified timeout, returning the latest state.  If the operation is\nalready done, the latest state is immediately returned.  If the timeout\nspecified is greater than the default HTTP/RPC timeout, the HTTP/RPC\ntimeout is used.  If the server does not support this method, it returns\n`google.rpc.Code.UNIMPLEMENTED`.\nNote that this method is on a best-effort basis.  It may return the latest\nstate before the specified timeout (including immediately), meaning even an\nimmediate response is no guarantee that the operation is done.\n", JSONSchema: "{\"properties\":{\"name\":{\"description\":\"The name of the operation resource to wait on.\",\"type\":\"string\"},\"timeout\":{\"description\":\"The maximum duration to wait before timing out. If left blank, the wait\\nwill be at most the time permitted by the underlying HTTP/RPC protocol.\\nIf RPC context deadline is also specified, the shorter one will be used.\",\"pattern\":\"^-?[0-9]+(\\\\.[0-9]+)?s$\",\"type\":[\"string\",\"null\"]}},\"required\":[],\"type\":\"object\"}"}
+	Operations_CancelOperationTool = Tool{Name: "google_longrunning_Operations_CancelOperation", Description: "Starts asynchronous cancellation on a long-running operation.  The server\nmakes a best effort to cancel the operation, but success is not\nguaranteed.  If the server doesn't support this method, it returns\n`google.rpc.Code.UNIMPLEMENTED`.  Clients can use\n[Operations.GetOperation][google.longrunning.Operations.GetOperation] or\nother methods to check whether the cancellation succeeded or whether the\noperation completed despite cancellation. On successful cancellation,\nthe operation is not deleted; instead, it becomes an operation with\nan [Operation.error][google.longrunning.Operation.error] value with a\n[google.rpc.Status.code][google.rpc.Status.code] of `1`, corresponding to\n`Code.CANCELLED`.\n", JSONSchema: "{\"additionalProperties\":false,\"properties\":{\"name\":{\"description\":\"The name of the operation resource to be cancelled.\",\"type\":\"string\"}},\"required\":[],\"type\":\"object\"}"}
+	Operations_DeleteOperationTool = Tool{Name: "google_longrunning_Operations_DeleteOperation", Description: "Deletes a long-running operation. This method indicates that the client is\nno longer interested in the operation result. It does not cancel the\noperation. If the server doesn't support this method, it returns\n`google.rpc.Code.UNIMPLEMENTED`.\n", JSONSchema: "{\"additionalProperties\":false,\"properties\":{\"name\":{\"description\":\"The name of the operation resource to be deleted.\",\"type\":\"string\"}},\"required\":[],\"type\":\"object\"}"}
+	Operations_GetOperationTool    = Tool{Name: "google_longrunning_Operations_GetOperation", Description: "Gets the latest state of a long-running operation.  Clients can use this\nmethod to poll the operation result at intervals as recommended by the API\nservice.\n", JSONSchema: "{\"additionalProperties\":false,\"properties\":{\"name\":{\"description\":\"The name of the operation resource.\",\"type\":\"string\"}},\"required\":[],\"type\":\"object\"}"}
+	Operations_ListOperationsTool  = Tool{Name: "google_longrunning_Operations_ListOperations", Description: "Lists operations that match the specified filter in the request. If the\nserver doesn't support this method, it returns `UNIMPLEMENTED`.\n", JSONSchema: "{\"additionalProperties\":false,\"properties\":{\"filter\":{\"description\":\"The standard list filter.\",\"type\":\"string\"},\"name\":{\"description\":\"The name of the operation's parent resource.\",\"type\":\"string\"},\"page_size\":{\"description\":\"The standard list page size.\",\"type\":\"integer\"},\"page_token\":{\"description\":\"The standard list page token.\",\"type\":\"string\"}},\"required\":[],\"type\":\"object\"}"}
+	Operations_WaitOperationTool   = Tool{Name: "google_longrunning_Operations_WaitOperation", Description: "Waits until the specified long-running operation is done or reaches at most\na specified timeout, returning the latest state.  If the operation is\nalready done, the latest state is immediately returned.  If the timeout\nspecified is greater than the default HTTP/RPC timeout, the HTTP/RPC\ntimeout is used.  If the server does not support this method, it returns\n`google.rpc.Code.UNIMPLEMENTED`.\nNote that this method is on a best-effort basis.  It may return the latest\nstate before the specified timeout (including immediately), meaning even an\nimmediate response is no guarantee that the operation is done.\n", JSONSchema: "{\"additionalProperties\":false,\"properties\":{\"name\":{\"description\":\"The name of the operation resource to wait on.\",\"type\":\"string\"},\"timeout\":{\"description\":\"The maximum duration to wait before timing out. If left blank, the wait\\nwill be at most the time permitted by the underlying HTTP/RPC protocol.\\nIf RPC context deadline is also specified, the shorter one will be used.\",\"pattern\":\"^-?[0-9]+(\\\\.[0-9]+)?s$\",\"type\":[\"string\",\"null\"]}},\"required\":[],\"type\":\"object\"}"}
 )
 
 // OperationsClient is compatible with the grpc-go client interface.
@@ -128,17 +128,23 @@ func OperationsTransformOneOfFieldsRecursive(obj interface{}) {
 	case map[string]interface{}:
 		// Transform oneOf fields in this object
 		for key, value := range v {
-			// Check if this looks like a oneOf discriminated union
-			if unionObj, ok := value.(map[string]interface{}); ok {
-				if typeField, hasType := unionObj["type"]; hasType {
-					if typeStr, ok := typeField.(string); ok {
-						// This is a discriminated union, transform it
-						// Remove the "type" field and move other properties up
-						delete(unionObj, "type")
+			// Check if this looks like a oneOf discriminated union (must have OneOfType postfix)
+			if strings.HasSuffix(key, "OneOfType") {
+				if unionObj, ok := value.(map[string]interface{}); ok {
+					if typeField, hasType := unionObj["type"]; hasType {
+						if typeStr, ok := typeField.(string); ok {
+							// Create a new object without the type field
+							variantObj := make(map[string]interface{})
+							for k, val := range unionObj {
+								if k != "type" {
+									variantObj[k] = val
+								}
+							}
 
-						// Replace the union object with the variant object
-						v[typeStr] = unionObj
-						delete(v, key)
+							// Replace the union object with the variant object
+							v[typeStr] = variantObj
+							delete(v, key)
+						}
 					}
 				}
 			}

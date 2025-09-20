@@ -123,8 +123,9 @@ func TestMessageSchemaStandard(t *testing.T) {
 	g.Expect(schema["type"]).To(Equal("object"))
 	g.Expect(schema).To(HaveKey("properties"))
 	g.Expect(schema).To(HaveKey("required"))
-	// Standard mode should not have additionalProperties: false
-	g.Expect(schema).ToNot(HaveKey("additionalProperties"))
+	// Object schemas should have additionalProperties: false
+	g.Expect(schema).To(HaveKey("additionalProperties"))
+	g.Expect(schema["additionalProperties"]).To(Equal(false))
 }
 
 func TestKindToType(t *testing.T) {
