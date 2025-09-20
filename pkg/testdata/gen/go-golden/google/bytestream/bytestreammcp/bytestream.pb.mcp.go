@@ -9,15 +9,15 @@ import (
 
 import (
 	"context"
-	"encoding/json"
+	"strings"
 	"github.com/mark3labs/mcp-go/mcp"
 	mcpserver "github.com/mark3labs/mcp-go/server"
-	"github.com/shaders/protoc-gen-go-mcp/pkg/runtime"
-	grpc "google.golang.org/grpc"
+	"encoding/json"
 	"google.golang.org/protobuf/encoding/protojson"
+	grpc "google.golang.org/grpc"
+	"github.com/shaders/protoc-gen-go-mcp/pkg/runtime"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"strings"
 )
 
 // Tool represents an MCP tool definition with essential fields
@@ -122,12 +122,12 @@ func ByteStreamTransformOneOfFieldsRecursive(obj interface{}) {
 			// Check if this looks like a oneOf discriminated union (must have OneOfType postfix)
 			if strings.HasSuffix(key, "OneOfType") {
 				if unionObj, ok := value.(map[string]interface{}); ok {
-					if typeField, hasType := unionObj["type"]; hasType {
+					if typeField, hasType := unionObj["object_type"]; hasType {
 						if typeStr, ok := typeField.(string); ok {
-							// Create a new object without the type field
+							// Create a new object without the object_type field
 							variantObj := make(map[string]interface{})
 							for k, val := range unionObj {
-								if k != "type" {
+								if k != "object_type" {
 									variantObj[k] = val
 								}
 							}
