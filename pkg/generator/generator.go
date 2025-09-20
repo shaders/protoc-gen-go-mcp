@@ -473,7 +473,7 @@ func (g *FileGenerator) messageSchemaFromDescriptor(md protoreflect.MessageDescr
 			// Add other required fields from the original schema
 			if originalRequired, ok := fieldSchema["required"]; ok {
 				if reqArray, ok := originalRequired.([]string); ok && len(reqArray) > 0 {
-					variant["required"] = append([]string{"type"}, reqArray...)
+					variant["required"] = append([]string{"object_type"}, reqArray...)
 				}
 			}
 
