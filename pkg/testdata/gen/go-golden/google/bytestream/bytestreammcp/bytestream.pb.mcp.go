@@ -20,15 +20,8 @@ import (
 	"strings"
 )
 
-// Tool represents an MCP tool definition with essential fields
-type Tool struct {
-	Name        string
-	Description string
-	JSONSchema  string
-}
-
 var (
-	ByteStream_QueryWriteStatusTool = Tool{Name: "google_bytestream_ByteStream_QueryWriteStatus", Description: "`QueryWriteStatus()` is used to find the `committed_size` for a resource\nthat is being written, which can then be used as the `write_offset` for\nthe next `Write()` call.\n\nIf the resource does not exist (i.e., the resource has been deleted, or the\nfirst `Write()` has not yet reached the service), this method returns the\nerror `NOT_FOUND`.\n\nThe client **may** call `QueryWriteStatus()` at any time to determine how\nmuch data has been processed for this resource. This is useful if the\nclient is buffering data and needs to know which data can be safely\nevicted. For any sequence of `QueryWriteStatus()` calls for a given\nresource name, the sequence of returned `committed_size` values will be\nnon-decreasing.\n", JSONSchema: "{\"additionalProperties\":false,\"properties\":{\"resource_name\":{\"description\":\"The name of the resource whose write status is being requested.\",\"type\":\"string\"}},\"required\":[],\"type\":\"object\"}"}
+	ByteStream_QueryWriteStatusTool = runtime.Tool{Name: "google_bytestream_ByteStream_QueryWriteStatus", Description: "`QueryWriteStatus()` is used to find the `committed_size` for a resource\nthat is being written, which can then be used as the `write_offset` for\nthe next `Write()` call.\n\nIf the resource does not exist (i.e., the resource has been deleted, or the\nfirst `Write()` has not yet reached the service), this method returns the\nerror `NOT_FOUND`.\n\nThe client **may** call `QueryWriteStatus()` at any time to determine how\nmuch data has been processed for this resource. This is useful if the\nclient is buffering data and needs to know which data can be safely\nevicted. For any sequence of `QueryWriteStatus()` calls for a given\nresource name, the sequence of returned `committed_size` values will be\nnon-decreasing.\n", JSONSchema: "{\"additionalProperties\":false,\"properties\":{\"resource_name\":{\"description\":\"The name of the resource whose write status is being requested.\",\"type\":\"string\"}},\"required\":[],\"type\":\"object\"}"}
 )
 
 // ByteStreamClient is compatible with the grpc-go client interface.

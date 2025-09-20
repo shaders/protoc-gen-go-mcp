@@ -148,16 +148,9 @@ import (
   "google.golang.org/protobuf/reflect/protoreflect"
 )
 
-// Tool represents an MCP tool definition with essential fields
-type Tool struct {
-  Name        string
-  Description string
-  JSONSchema  string
-}
-
 var (
 {{- range $key, $val := .Tools }}
-  {{$key}}Tool = Tool{Name: {{ printf "%q" $val.Name }}, Description: {{ printf "%q" $val.Description }}, JSONSchema: {{ printf "%q" $val.JSONSchema }}}
+  {{$key}}Tool = runtime.Tool{Name: {{ printf "%q" $val.Name }}, Description: {{ printf "%q" $val.Description }}, JSONSchema: {{ printf "%q" $val.JSONSchema }}}
 {{- end }}
 )
 

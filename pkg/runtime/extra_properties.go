@@ -6,6 +6,13 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
+// Tool represents an MCP tool definition with essential fields
+type Tool struct {
+	Name        string
+	Description string
+	JSONSchema  string
+}
+
 // Option defines functional options for MCP functions
 type Option func(*config)
 
