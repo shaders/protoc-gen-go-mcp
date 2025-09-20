@@ -483,7 +483,7 @@ func (g *FileGenerator) messageSchemaFromDescriptor(md protoreflect.MessageDescr
 					variant["required"] = append([]string{"type"}, reqArray...)
 				}
 			}
-			
+
 			oneOf[oneOfName] = append(oneOf[oneOfName], variant)
 		} else {
 			// If not part of a oneof, handle as a normal field
