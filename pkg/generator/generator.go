@@ -417,6 +417,16 @@ func isFieldRequired(fd protoreflect.FieldDescriptor) bool {
 
 // isFieldRequiredWithOptionalSupport checks if a field is required considering optional keyword support
 func (g *FileGenerator) isFieldRequiredWithOptionalSupport(fd protoreflect.FieldDescriptor) bool {
+	// Repeated fields are never required (they can be empty arrays)
+	if fd.IsList() {
+		return false
+	}
+
+	// Map fields are never required (they can be empty objects)
+	if fd.IsMap() {
+		return false
+	}
+
 	// First check google.api.field_behavior annotation
 	if isFieldRequired(fd) {
 		return true

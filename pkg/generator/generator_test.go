@@ -182,7 +182,7 @@ func TestOptionalKeywordSupport(t *testing.T) {
 		{
 			name:                       "regular field without optional support",
 			optionalKeywordSupport:     false,
-			fieldName:                  "labels",
+			fieldName:                  "thumbnail", // bytes field from test proto
 			fieldHasOptionalKeyword:    false,
 			fieldHasRequiredAnnotation: false,
 			wantRequired:               false,
@@ -190,7 +190,7 @@ func TestOptionalKeywordSupport(t *testing.T) {
 		{
 			name:                       "regular field with optional support",
 			optionalKeywordSupport:     true,
-			fieldName:                  "labels",
+			fieldName:                  "thumbnail", // bytes field from test proto
 			fieldHasOptionalKeyword:    false,
 			fieldHasRequiredAnnotation: false,
 			wantRequired:               true,
@@ -226,6 +226,22 @@ func TestOptionalKeywordSupport(t *testing.T) {
 			fieldHasOptionalKeyword:    false,
 			fieldHasRequiredAnnotation: true,
 			wantRequired:               true,
+		},
+		{
+			name:                       "repeated field with optional support",
+			optionalKeywordSupport:     true,
+			fieldName:                  "tags", // repeated field from test proto
+			fieldHasOptionalKeyword:    false,
+			fieldHasRequiredAnnotation: false,
+			wantRequired:               false,
+		},
+		{
+			name:                       "map field with optional support",
+			optionalKeywordSupport:     true,
+			fieldName:                  "labels", // map field from test proto
+			fieldHasOptionalKeyword:    false,
+			fieldHasRequiredAnnotation: false,
+			wantRequired:               false,
 		},
 	}
 
@@ -278,7 +294,7 @@ func TestMessageSchemaWithOptionalSupport(t *testing.T) {
 		{
 			name:                   "with optional keyword support",
 			optionalKeywordSupport: true,
-			wantRequiredFields:     []string{"name", "labels", "tags", "thumbnail", "item_typeOneOfType"}, // All non-optional fields
+			wantRequiredFields:     []string{"name", "thumbnail", "item_typeOneOfType"}, // All non-optional, non-repeated, non-map fields
 		},
 	}
 
@@ -301,10 +317,14 @@ func TestMessageSchemaWithOptionalSupport(t *testing.T) {
 					expectedField, tt.optionalKeywordSupport)
 			}
 
-			// In optional keyword support mode, "description" should NOT be required (it's optional)
+			// In optional keyword support mode, these should NOT be required
 			if tt.optionalKeywordSupport {
 				g.Expect(requiredFields).ToNot(ContainElement("description"),
 					"Optional field 'description' should not be required")
+				g.Expect(requiredFields).ToNot(ContainElement("tags"),
+					"Repeated field 'tags' should never be required")
+				g.Expect(requiredFields).ToNot(ContainElement("labels"),
+					"Map field 'labels' should never be required")
 			}
 		})
 	}
