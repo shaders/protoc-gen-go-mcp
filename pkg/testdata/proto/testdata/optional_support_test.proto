@@ -1,0 +1,62 @@
+// Copyright 2025 Redpanda Data, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//	http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package testdata;
+
+import "google/api/field_behavior.proto";
+
+// OptionalSupportTestService tests optional keyword support functionality
+service OptionalSupportTestService {
+  // Test method with various field types to test optional keyword support
+  rpc TestOptionalFields(TestOptionalFieldsRequest) returns (TestOptionalFieldsResponse);
+}
+
+message TestOptionalFieldsRequest {
+  // Regular field - should be required when optional keyword support is enabled
+  string regular_field = 1;
+
+  // Optional field - should not be required regardless of setting
+  optional string optional_field = 2;
+
+  // Field marked as required via annotation - should always be required
+  string annotated_required_field = 3 [(google.api.field_behavior) = REQUIRED];
+
+  // Optional field with annotation - annotation takes precedence
+  optional string optional_annotated_field = 4 [(google.api.field_behavior) = REQUIRED];
+
+  // Regular int32 field
+  int32 regular_number = 5;
+
+  // Optional int32 field
+  optional int32 optional_number = 6;
+
+  // Regular bool field
+  bool regular_bool = 7;
+
+  // Optional bool field
+  optional bool optional_bool = 8;
+
+  // Repeated field (should never be required as it can be empty)
+  repeated string repeated_field = 9;
+
+  // Map field (should never be required as it can be empty)
+  map<string, string> map_field = 10;
+}
+
+message TestOptionalFieldsResponse {
+  bool success = 1;
+  string message = 2;
+}

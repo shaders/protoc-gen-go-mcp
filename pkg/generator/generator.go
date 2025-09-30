@@ -46,6 +46,9 @@ type FileGenerator struct {
 
 	// messageMap maps from protoreflect.MessageDescriptor to protogen.Message
 	messageMap map[string]*protogen.Message
+
+	// optionalKeywordSupport when true makes fields required by default unless marked optional
+	optionalKeywordSupport bool
 }
 
 func NewFileGenerator(f *protogen.File, gen *protogen.Plugin) *FileGenerator {
@@ -412,6 +415,27 @@ func isFieldRequired(fd protoreflect.FieldDescriptor) bool {
 	return false
 }
 
+// isFieldRequiredWithOptionalSupport checks if a field is required considering optional keyword support
+func (g *FileGenerator) isFieldRequiredWithOptionalSupport(fd protoreflect.FieldDescriptor) bool {
+	// First check google.api.field_behavior annotation
+	if isFieldRequired(fd) {
+		return true
+	}
+
+	// If optional keyword support is enabled
+	if g.optionalKeywordSupport {
+		// Check if field is marked as optional (proto3 optional or part of synthetic oneof)
+		if fd.HasOptionalKeyword() {
+			return false
+		}
+		// In optional keyword support mode, fields are required by default unless marked optional
+		return true
+	}
+
+	// Default behavior: fields are not required unless explicitly marked
+	return false
+}
+
 // messageSchemaWithComments generates a schema for a protogen.Message with comments
 func (g *FileGenerator) messageSchemaWithComments(msg *protogen.Message) map[string]any {
 	return g.messageSchemaFromDescriptor(msg.Desc, msg)
@@ -481,7 +505,7 @@ func (g *FileGenerator) messageSchemaFromDescriptor(md protoreflect.MessageDescr
 		} else {
 			// If not part of a oneof, handle as a normal field
 			normalFields[name] = g.getTypeWithComment(nestedFd, comment)
-			if isFieldRequired(nestedFd) {
+			if g.isFieldRequiredWithOptionalSupport(nestedFd) {
 				required = append(required, name)
 			}
 		}
@@ -749,6 +773,11 @@ func capitalizeFirstLetter(s string) string {
 }
 
 func (g *FileGenerator) Generate(packageSuffix string) {
+	g.GenerateWithOptions(packageSuffix, false)
+}
+
+func (g *FileGenerator) GenerateWithOptions(packageSuffix string, optionalKeywordSupport bool) {
+	g.optionalKeywordSupport = optionalKeywordSupport
 	file := g.f
 	if len(g.f.Services) == 0 {
 		return

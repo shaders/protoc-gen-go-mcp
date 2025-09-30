@@ -170,6 +170,146 @@ func TestSchemaMarshaling(t *testing.T) {
 	g.Expect(err).ToNot(HaveOccurred())
 }
 
+func TestOptionalKeywordSupport(t *testing.T) {
+	tests := []struct {
+		name                       string
+		optionalKeywordSupport     bool
+		fieldName                  string
+		fieldHasOptionalKeyword    bool
+		fieldHasRequiredAnnotation bool
+		wantRequired               bool
+	}{
+		{
+			name:                       "regular field without optional support",
+			optionalKeywordSupport:     false,
+			fieldName:                  "labels",
+			fieldHasOptionalKeyword:    false,
+			fieldHasRequiredAnnotation: false,
+			wantRequired:               false,
+		},
+		{
+			name:                       "regular field with optional support",
+			optionalKeywordSupport:     true,
+			fieldName:                  "labels",
+			fieldHasOptionalKeyword:    false,
+			fieldHasRequiredAnnotation: false,
+			wantRequired:               true,
+		},
+		{
+			name:                       "optional field without optional support",
+			optionalKeywordSupport:     false,
+			fieldName:                  "description",
+			fieldHasOptionalKeyword:    true,
+			fieldHasRequiredAnnotation: false,
+			wantRequired:               false,
+		},
+		{
+			name:                       "optional field with optional support",
+			optionalKeywordSupport:     true,
+			fieldName:                  "description",
+			fieldHasOptionalKeyword:    true,
+			fieldHasRequiredAnnotation: false,
+			wantRequired:               false,
+		},
+		{
+			name:                       "annotated required field without optional support",
+			optionalKeywordSupport:     false,
+			fieldName:                  "name",
+			fieldHasOptionalKeyword:    false,
+			fieldHasRequiredAnnotation: true,
+			wantRequired:               true,
+		},
+		{
+			name:                       "annotated required field with optional support",
+			optionalKeywordSupport:     true,
+			fieldName:                  "name",
+			fieldHasOptionalKeyword:    false,
+			fieldHasRequiredAnnotation: true,
+			wantRequired:               true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := NewWithT(t)
+
+			fg := &FileGenerator{optionalKeywordSupport: tt.optionalKeywordSupport}
+
+			// Use CreateItemRequest from test data which has various field types
+			msg := &testdata.CreateItemRequest{}
+			msgDesc := msg.ProtoReflect().Descriptor()
+
+			// Find the field we want to test
+			var field protoreflect.FieldDescriptor
+			for i := 0; i < msgDesc.Fields().Len(); i++ {
+				fd := msgDesc.Fields().Get(i)
+				if string(fd.Name()) == tt.fieldName {
+					field = fd
+					break
+				}
+			}
+
+			// Skip test if field not found in the test message
+			if field == nil {
+				t.Skipf("Field %s not found in test message", tt.fieldName)
+			}
+
+			isRequired := fg.isFieldRequiredWithOptionalSupport(field)
+			g.Expect(isRequired).To(Equal(tt.wantRequired),
+				"Expected field %s to have required=%v with optionalKeywordSupport=%v",
+				tt.fieldName, tt.wantRequired, tt.optionalKeywordSupport)
+		})
+	}
+}
+
+func TestMessageSchemaWithOptionalSupport(t *testing.T) {
+	g := NewWithT(t)
+
+	tests := []struct {
+		name                   string
+		optionalKeywordSupport bool
+		wantRequiredFields     []string
+	}{
+		{
+			name:                   "without optional keyword support",
+			optionalKeywordSupport: false,
+			wantRequiredFields:     []string{"name"}, // Only annotated field
+		},
+		{
+			name:                   "with optional keyword support",
+			optionalKeywordSupport: true,
+			wantRequiredFields:     []string{"name", "labels", "tags", "thumbnail", "item_typeOneOfType"}, // All non-optional fields
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fg := &FileGenerator{optionalKeywordSupport: tt.optionalKeywordSupport}
+
+			// Use CreateItemRequest which has mix of required, optional, and annotated fields
+			msg := &testdata.CreateItemRequest{}
+			schema := fg.messageSchemaFromDescriptor(msg.ProtoReflect().Descriptor(), nil)
+
+			g.Expect(schema).To(HaveKey("required"))
+			requiredFields, ok := schema["required"].([]string)
+			g.Expect(ok).To(BeTrue(), "required field should be a string slice")
+
+			// Check that all expected required fields are present
+			for _, expectedField := range tt.wantRequiredFields {
+				g.Expect(requiredFields).To(ContainElement(expectedField),
+					"Field %s should be required with optionalKeywordSupport=%v",
+					expectedField, tt.optionalKeywordSupport)
+			}
+
+			// In optional keyword support mode, "description" should NOT be required (it's optional)
+			if tt.optionalKeywordSupport {
+				g.Expect(requiredFields).ToNot(ContainElement("description"),
+					"Optional field 'description' should not be required")
+			}
+		})
+	}
+}
+
 var updateGolden = flag.Bool("update-golden", false, "Update golden files")
 
 func TestFullGeneration(t *testing.T) {

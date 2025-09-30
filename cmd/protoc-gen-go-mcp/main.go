@@ -27,6 +27,11 @@ func main() {
 		"mcp",
 		"Generate files into a sub-package of the package containing the base .pb.go files using the given suffix. An empty suffix denotes to generate into the same package as the base pb.go files.",
 	)
+	optionalKeywordSupport := flagSet.Bool(
+		"optional_keyword_support",
+		false,
+		"When enabled, fields are required by default unless marked as optional in protobuf",
+	)
 
 	protogen.Options{
 		ParamFunc: flagSet.Set,
@@ -35,7 +40,7 @@ func main() {
 			if !f.Generate {
 				continue
 			}
-			generator.NewFileGenerator(f, gen).Generate(*packageSuffix)
+			generator.NewFileGenerator(f, gen).GenerateWithOptions(*packageSuffix, *optionalKeywordSupport)
 		}
 		return nil
 	})
