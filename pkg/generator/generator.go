@@ -497,11 +497,10 @@ func (g *FileGenerator) messageSchemaFromDescriptor(md protoreflect.MessageDescr
 			}
 
 			variant := map[string]any{
-				"type":                 "object",
-				"title":                name,
-				"properties":           props,
-				"required":             []string{"object_type"}, // object_type field is always required
-				"additionalProperties": false,
+				"type":       "object",
+				"title":      name,
+				"properties": props,
+				"required":   []string{"object_type"}, // object_type field is always required
 			}
 
 			// Add other required fields from the original schema
@@ -528,10 +527,9 @@ func (g *FileGenerator) messageSchemaFromDescriptor(md protoreflect.MessageDescr
 
 	// Build final schema
 	result := map[string]any{
-		"type":                 "object",
-		"properties":           normalFields,
-		"required":             required,
-		"additionalProperties": false,
+		"type":       "object",
+		"properties": normalFields,
+		"required":   required,
 	}
 
 	return result
@@ -564,9 +562,8 @@ func (g *FileGenerator) getType(fd protoreflect.FieldDescriptor) map[string]any 
 		}
 
 		return map[string]any{
-			"type":                 "object",
-			"propertyNames":        keyConstraints,
-			"additionalProperties": true,
+			"type":          "object",
+			"propertyNames": keyConstraints,
 		}
 	}
 
@@ -607,8 +604,7 @@ var (
 		"google.protobuf.Timestamp": {"type": []string{"string", "null"}, "format": "date-time"},
 		"google.protobuf.Duration":  {"type": []string{"string", "null"}, "pattern": `^-?[0-9]+(\.[0-9]+)?s$`},
 		"google.protobuf.Struct": {
-			"type":                 "object",
-			"additionalProperties": true,
+			"type": "object",
 		},
 		"google.protobuf.Value": {
 			"description": "represents a google.protobuf.Value, a dynamic JSON value (string, number, boolean, array, object).",

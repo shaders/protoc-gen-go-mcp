@@ -45,7 +45,6 @@ func TestGetTypeStandard(t *testing.T) {
 			},
 			wantSchema: func(g *WithT, schema map[string]any) {
 				g.Expect(schema["type"]).To(Equal("object"))
-				g.Expect(schema).To(HaveKey("additionalProperties"))
 				g.Expect(schema).To(HaveKey("propertyNames"))
 			},
 		},
@@ -58,7 +57,6 @@ func TestGetTypeStandard(t *testing.T) {
 			},
 			wantSchema: func(g *WithT, schema map[string]any) {
 				g.Expect(schema["type"]).To(Equal("object"))
-				g.Expect(schema["additionalProperties"]).To(Equal(true))
 			},
 		},
 		{
@@ -123,9 +121,7 @@ func TestMessageSchemaStandard(t *testing.T) {
 	g.Expect(schema["type"]).To(Equal("object"))
 	g.Expect(schema).To(HaveKey("properties"))
 	g.Expect(schema).To(HaveKey("required"))
-	// Object schemas should have additionalProperties: false
-	g.Expect(schema).To(HaveKey("additionalProperties"))
-	g.Expect(schema["additionalProperties"]).To(Equal(false))
+	// Object schemas no longer include additionalProperties
 }
 
 func TestKindToType(t *testing.T) {

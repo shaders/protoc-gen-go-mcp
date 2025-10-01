@@ -40,10 +40,8 @@ func TestExtraPropertiesSchemaModification(t *testing.T) {
 				"type": "string",
 			},
 			"labels": map[string]interface{}{
-				"type": "object",
-				"additionalProperties": map[string]interface{}{
-					"type": "string",
-				},
+				"type":          "object",
+				"propertyNames": map[string]interface{}{"type": "string"},
 			},
 			"tags": map[string]interface{}{
 				"type":  "array",
@@ -118,10 +116,8 @@ func TestExtraPropertiesSchemaModificationWithCustomField(t *testing.T) {
 				"type": "string",
 			},
 			"labels": map[string]interface{}{
-				"type": "object",
-				"additionalProperties": map[string]interface{}{
-					"type": "string",
-				},
+				"type":          "object",
+				"propertyNames": map[string]interface{}{"type": "string"},
 			},
 			"tags": map[string]interface{}{
 				"type":  "array",
