@@ -132,7 +132,7 @@ func TestKindToType(t *testing.T) {
 		{protoreflect.BoolKind, "boolean"},
 		{protoreflect.StringKind, "string"},
 		{protoreflect.Int32Kind, "integer"},
-		{protoreflect.Int64Kind, "string"}, // encoded as string for safety
+		{protoreflect.Int64Kind, "integer"}, // encoded as integer
 		{protoreflect.FloatKind, "number"},
 		{protoreflect.DoubleKind, "number"},
 		{protoreflect.BytesKind, "string"},

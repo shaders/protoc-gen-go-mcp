@@ -391,7 +391,7 @@ func kindToType(kind protoreflect.Kind) string {
 		return "integer"
 	case protoreflect.Int64Kind, protoreflect.Sint64Kind, protoreflect.Sfixed64Kind,
 		protoreflect.Uint64Kind, protoreflect.Fixed64Kind:
-		return "string" // safely encode as string
+		return "integer"
 	case protoreflect.FloatKind, protoreflect.DoubleKind:
 		return "number"
 	case protoreflect.BytesKind:
@@ -625,10 +625,10 @@ var (
 		},
 		"google.protobuf.DoubleValue": {"type": "number", "nullable": true},
 		"google.protobuf.FloatValue":  {"type": "number", "nullable": true},
-		"google.protobuf.Int32Value":  {"type": "number", "nullable": true},
-		"google.protobuf.UInt32Value": {"type": "number", "nullable": true},
-		"google.protobuf.Int64Value":  {"type": "string", "nullable": true},
-		"google.protobuf.UInt64Value": {"type": "string", "nullable": true},
+		"google.protobuf.Int32Value":  {"type": "integer", "nullable": true},
+		"google.protobuf.UInt32Value": {"type": "integer", "nullable": true},
+		"google.protobuf.Int64Value":  {"type": "integer", "nullable": true},
+		"google.protobuf.UInt64Value": {"type": "integer", "nullable": true},
 		"google.protobuf.StringValue": {"type": "string", "nullable": true},
 		"google.protobuf.BoolValue":   {"type": "boolean", "nullable": true},
 		"google.protobuf.BytesValue":  {"type": "string", "format": "byte", "nullable": true},
