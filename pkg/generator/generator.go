@@ -535,9 +535,182 @@ func (g *FileGenerator) messageSchemaFromDescriptor(md protoreflect.MessageDescr
 	return result
 }
 
+// messageSchemaWithDefs generates a top-level schema with $defs for nested message types
+func (g *FileGenerator) messageSchemaWithDefs(md protoreflect.MessageDescriptor, protoMsg *protogen.Message) map[string]any {
+	defs := make(map[string]any)
+	visiting := make(map[string]bool) // Track types being processed to prevent cycles
+	required := []string{}
+	// Fields that are not oneOf
+	normalFields := map[string]any{}
+	// One entry per oneOf block in the message.
+	oneOf := map[string][]map[string]any{}
+
+	// Create a map of field names to comments for lookup
+	fieldComments := g.extractFieldComments(protoMsg)
+
+	// Process all fields in the message descriptor
+	for i := 0; i < md.Fields().Len(); i++ {
+		nestedFd := md.Fields().Get(i)
+		name := string(nestedFd.Name())
+
+		// Get field comment if available
+		var comment string
+		if fieldComments != nil {
+			comment = fieldComments[name]
+		}
+
+		// OneOf handling - collect oneOf fields for later processing
+		if oneof := nestedFd.ContainingOneof(); oneof != nil && !oneof.IsSynthetic() {
+			oneOfName := string(oneof.Name())
+			if _, ok := oneOf[oneOfName]; !ok {
+				oneOf[oneOfName] = []map[string]any{}
+			}
+
+			// Create a discriminated union entry
+			fieldSchema := g.getTypeWithDefsAndComment(nestedFd, comment, defs, visiting)
+			// Add object_type discriminator property
+			if fieldSchema["properties"] == nil {
+				fieldSchema["properties"] = map[string]any{}
+			}
+			props := fieldSchema["properties"].(map[string]any)
+			props["object_type"] = map[string]any{
+				"type":  "string",
+				"const": name, // The field name becomes the type value
+			}
+
+			variant := map[string]any{
+				"type":       "object",
+				"title":      name,
+				"properties": props,
+				"required":   []string{"object_type"}, // object_type field is always required
+			}
+
+			// Add other required fields from the original schema
+			if originalRequired, ok := fieldSchema["required"]; ok {
+				if reqArray, ok := originalRequired.([]string); ok && len(reqArray) > 0 {
+					variant["required"] = append([]string{"object_type"}, reqArray...)
+				}
+			}
+
+			oneOf[oneOfName] = append(oneOf[oneOfName], variant)
+		} else {
+			// If not part of a oneof, handle as a normal field
+			normalFields[name] = g.getTypeWithDefsAndComment(nestedFd, comment, defs, visiting)
+			if g.isFieldRequiredWithOptionalSupport(nestedFd) {
+				required = append(required, name)
+			}
+		}
+	}
+
+	// Add oneOf constraints if any exist
+	if len(oneOf) > 0 {
+		required = g.addOneOfConstraints(normalFields, oneOf, required)
+	}
+
+	// Build final schema
+	result := map[string]any{
+		"$schema":    "https://json-schema.org/draft/2020-12/schema",
+		"type":       "object",
+		"properties": normalFields,
+		"required":   required,
+	}
+
+	// Add $defs if any were collected
+	if len(defs) > 0 {
+		result["$defs"] = defs
+	}
+
+	return result
+}
+
+// messageSchemaWithDefsInternal generates schema with cycle detection support
+func (g *FileGenerator) messageSchemaWithDefsInternal(md protoreflect.MessageDescriptor, protoMsg *protogen.Message, defs map[string]any, visiting map[string]bool) map[string]any {
+	required := []string{}
+	normalFields := map[string]any{}
+	oneOf := map[string][]map[string]any{}
+
+	fieldComments := g.extractFieldComments(protoMsg)
+
+	for i := 0; i < md.Fields().Len(); i++ {
+		nestedFd := md.Fields().Get(i)
+		name := string(nestedFd.Name())
+
+		var comment string
+		if fieldComments != nil {
+			comment = fieldComments[name]
+		}
+
+		if oneof := nestedFd.ContainingOneof(); oneof != nil && !oneof.IsSynthetic() {
+			oneOfName := string(oneof.Name())
+			if _, ok := oneOf[oneOfName]; !ok {
+				oneOf[oneOfName] = []map[string]any{}
+			}
+
+			fieldSchema := g.getTypeWithDefsAndComment(nestedFd, comment, defs, visiting)
+			if fieldSchema["properties"] == nil {
+				fieldSchema["properties"] = map[string]any{}
+			}
+			props := fieldSchema["properties"].(map[string]any)
+			props["object_type"] = map[string]any{
+				"type":  "string",
+				"const": name,
+			}
+
+			variant := map[string]any{
+				"type":       "object",
+				"title":      name,
+				"properties": props,
+				"required":   []string{"object_type"},
+			}
+
+			if originalRequired, ok := fieldSchema["required"]; ok {
+				if reqArray, ok := originalRequired.([]string); ok && len(reqArray) > 0 {
+					variant["required"] = append([]string{"object_type"}, reqArray...)
+				}
+			}
+
+			oneOf[oneOfName] = append(oneOf[oneOfName], variant)
+		} else {
+			normalFields[name] = g.getTypeWithDefsAndComment(nestedFd, comment, defs, visiting)
+			if g.isFieldRequiredWithOptionalSupport(nestedFd) {
+				required = append(required, name)
+			}
+		}
+	}
+
+	if len(oneOf) > 0 {
+		required = g.addOneOfConstraints(normalFields, oneOf, required)
+	}
+
+	result := map[string]any{
+		"type":       "object",
+		"properties": normalFields,
+		"required":   required,
+	}
+
+	return result
+}
+
+// messageSchemaFromDescriptorWithDefs generates schema for nested messages with cycle detection
+func (g *FileGenerator) messageSchemaFromDescriptorWithDefs(md protoreflect.MessageDescriptor, protoMsg *protogen.Message, defs map[string]any, visiting map[string]bool) map[string]any {
+	return g.messageSchemaWithDefsInternal(md, protoMsg, defs, visiting)
+}
+
 // getTypeWithComment generates a schema for a field with an optional comment
 func (g *FileGenerator) getTypeWithComment(fd protoreflect.FieldDescriptor, comment string) map[string]any {
 	schema := g.getType(fd)
+
+	// Add description if comment is available and not empty
+	if trimmed := strings.TrimSpace(comment); trimmed != "" {
+		schema["description"] = trimmed
+	}
+
+	return schema
+}
+
+// getTypeWithDefsAndComment generates a schema for a field with $defs collection
+func (g *FileGenerator) getTypeWithDefsAndComment(fd protoreflect.FieldDescriptor, comment string, defs map[string]any, visiting map[string]bool) map[string]any {
+	schema := g.getTypeWithDefs(fd, defs, visiting)
 
 	// Add description if comment is available and not empty
 	if trimmed := strings.TrimSpace(comment); trimmed != "" {
@@ -572,6 +745,96 @@ func (g *FileGenerator) getType(fd protoreflect.FieldDescriptor) map[string]any 
 	switch fd.Kind() {
 	case protoreflect.MessageKind:
 		schema = g.getMessageSchema(fd.Message())
+
+	case protoreflect.EnumKind:
+		schema = g.getEnumSchema(fd.Enum())
+
+	default:
+		schema = map[string]any{
+			"type": kindToType(fd.Kind()),
+		}
+		if fd.Kind() == protoreflect.BytesKind {
+			schema["contentEncoding"] = "base64"
+			schema["format"] = "byte"
+		}
+	}
+
+	// Handle repeated fields here, wrapping the actual schema in an array.
+	if fd.IsList() {
+		return map[string]any{
+			"type":  "array",
+			"items": schema,
+		}
+	}
+	return schema
+}
+
+// getTypeWithDefs generates a schema for a field, using $ref for message types
+func (g *FileGenerator) getTypeWithDefs(fd protoreflect.FieldDescriptor, defs map[string]any, visiting map[string]bool) map[string]any {
+	if fd.IsMap() {
+		keyType := fd.MapKey().Kind()
+		keyConstraints := map[string]any{"type": "string"}
+
+		switch keyType {
+		case protoreflect.BoolKind:
+			keyConstraints["enum"] = []string{"true", "false"}
+		case protoreflect.Uint32Kind, protoreflect.Fixed32Kind, protoreflect.Uint64Kind, protoreflect.Fixed64Kind:
+			keyConstraints["pattern"] = "^(0|[1-9]\\d*)$"
+		case protoreflect.Int32Kind, protoreflect.Sint32Kind, protoreflect.Sfixed32Kind, protoreflect.Int64Kind, protoreflect.Sint64Kind, protoreflect.Sfixed64Kind:
+			keyConstraints["pattern"] = "^-?(0|[1-9]\\d*)$"
+		}
+
+		return map[string]any{
+			"type":          "object",
+			"propertyNames": keyConstraints,
+		}
+	}
+
+	var schema map[string]any
+
+	switch fd.Kind() {
+	case protoreflect.MessageKind:
+		md := fd.Message()
+		fullName := string(md.FullName())
+
+		// Check if this is a well-known type
+		if wktSchema, ok := wellKnownTypeSchemas[fullName]; ok {
+			schema = wktSchema
+		} else {
+			// Use simple name for the definition key
+			defName := string(md.Name())
+
+			// Check if we're currently processing this type (cycle detection)
+			if visiting[fullName] {
+				// We're in a recursive reference, just use $ref without adding to defs
+				schema = map[string]any{
+					"$ref": "#/$defs/" + defName,
+				}
+			} else if _, exists := defs[defName]; !exists {
+				// Mark as visiting to detect cycles
+				visiting[fullName] = true
+
+				// Generate the full schema for this message
+				if protoMsg, ok := g.messageMap[fullName]; ok {
+					defs[defName] = g.messageSchemaFromDescriptorWithDefs(md, protoMsg, defs, visiting)
+				} else {
+					defs[defName] = g.messageSchemaWithDefsInternal(md, nil, defs, visiting)
+				}
+
+				// Unmark after processing
+				delete(visiting, fullName)
+
+				// Return a $ref to the definition
+				schema = map[string]any{
+					"$ref": "#/$defs/" + defName,
+				}
+			} else {
+				// Already exists in defs, just reference it
+				schema = map[string]any{
+					"$ref": "#/$defs/" + defName,
+				}
+			}
+		}
 
 	case protoreflect.EnumKind:
 		schema = g.getEnumSchema(fd.Enum())
@@ -837,8 +1100,8 @@ func (g *FileGenerator) GenerateWithOptions(packageSuffix string, optionalKeywor
 				continue
 			}
 
-			// Generate schema with comments
-			schema := g.messageSchemaWithComments(meth.Input)
+			// Generate schema with $defs for nested messages
+			schema := g.messageSchemaWithDefs(meth.Input.Desc, meth.Input)
 			marshaled, err := json.Marshal(schema)
 			if err != nil {
 				panic(err)
