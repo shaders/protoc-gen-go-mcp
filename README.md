@@ -13,14 +13,17 @@ It generates `*.pb.mcp.go` files for each protobuf service, enabling you to dele
 ## ✨ Features
 
 - 🚀 **Auto-generates MCP handlers** from your `.proto` services
-- 🧠 **AI-Friendly Schemas** - Clean, simple JSON schemas that AI models can easily understand
+- 🧠 **AI-Friendly Schemas** - Clean JSON schemas using modern JSON Schema 2020-12 specification
+- 📚 **JSON Schema $defs Support** - Message types defined once in `$defs` and referenced via `$ref`
+- 🔄 **Recursive Structure Support** - Handles circular and recursive message references with cycle detection
 - 🔀 **Advanced OneOf Support** - Handles protobuf oneOf with discriminated unions and automatic transformation
 - 💬 **Field Comments as Descriptions** - Preserves protobuf comments in tool schemas (including nested messages)
 - 📦 **JSON Schema Generation** for method inputs with proper validation
 - 🔄 **Flexible Integration** - Wire up to gRPC servers or clients
 - 🧩 **Easy [`buf`](https://buf.build) Integration**
 - ⚡  **Well-Known Types** - Proper handling of Google protobuf well-known types
-- 🎯 **Gemini Compliant** - Tool names follow Google's restrictions  
+- 🎯 **Gemini Compliant** - Tool names follow Google's restrictions
+- 🛡️ **Production Ready** - Robust error handling, no panics, safe type assertions  
   
 
 ## 🔧 Usage
@@ -55,9 +58,96 @@ gen
             └── test_service.pb.mcp.go
 ```
 
-### Advanced OneOf Support
+### Advanced Schema Generation
 
-`protoc-gen-go-mcp` generates AI-friendly schemas for protobuf oneOf fields using discriminated unions
+#### JSON Schema Structure
+
+`protoc-gen-go-mcp` generates modern JSON schemas with `$defs` for better organization:
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "user": {"$ref": "#/$defs/User"},
+    "settings": {"$ref": "#/$defs/Settings"}
+  },
+  "required": ["user"],
+  "$defs": {
+    "User": {
+      "type": "object",
+      "properties": {
+        "name": {"type": "string", "description": "User's full name"},
+        "email": {"type": "string"}
+      },
+      "required": ["name", "email"]
+    },
+    "Settings": {
+      "type": "object",
+      "properties": {
+        "theme": {"type": "string"}
+      },
+      "required": []
+    }
+  }
+}
+```
+
+#### OneOf Support with Discriminated Unions
+
+`protoc-gen-go-mcp` generates AI-friendly schemas for protobuf oneOf fields using discriminated unions with `object_type` field:
+
+```protobuf
+// Proto definition
+message Item {
+  oneof item_type {
+    Product product = 1;
+    Service service = 2;
+  }
+}
+```
+
+Generates schema:
+```json
+{
+  "item_typeOneOfType": {
+    "oneOf": [
+      {
+        "type": "object",
+        "properties": {
+          "object_type": {"const": "product", "type": "string"},
+          "price": {"type": "number"}
+        },
+        "required": ["object_type"]
+      },
+      {
+        "type": "object",
+        "properties": {
+          "object_type": {"const": "service", "type": "string"},
+          "duration": {"type": "string"}
+        },
+        "required": ["object_type"]
+      }
+    ]
+  }
+}
+```
+
+#### Recursive Structure Support
+
+Handles complex recursive structures without stack overflow:
+
+```protobuf
+message FilterExpression {
+  message Operation {
+    repeated FilterExpression operands = 1;  // Recursive reference
+  }
+  oneof kind {
+    Operation operation = 1;
+    string value = 2;
+  }
+}
+```
 
 ### Wiring up with gRPC client
 
@@ -175,5 +265,16 @@ task generate-golden
 go test ./pkg/generator -update-golden
 ```
 
+## 🏗️ Recent Improvements
+
+### v0.2.0 (Latest)
+- **JSON Schema 2020-12**: Modern schema generation with `$defs` and `$ref`
+- **Cycle Detection**: Prevents stack overflow with recursive message structures
+- **Robust Error Handling**: Replaced panics with proper error propagation
+- **Code Quality**: Eliminated code duplication, added safe type assertions
+- **Performance**: Optimized memory allocation and string operations
+- **Documentation**: Comprehensive documentation for all public APIs
+
 ## ⚠️ Limitations
 - Tool name mangling for long RPC names: If the full RPC name exceeds 64 characters, the head of the tool name is mangled to fit.
+- Streaming RPCs are not yet supported (unary only)
