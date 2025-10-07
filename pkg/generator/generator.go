@@ -35,9 +35,17 @@ import (
 )
 
 const (
+	// GeneratedFilenameExtension is the extension for generated MCP files
 	GeneratedFilenameExtension = ".pb.mcp.go"
+
+	// MaxToolNameLength is the maximum length for tool names (Gemini restriction)
+	MaxToolNameLength = 64
+
+	// HashPrefixLength is the length of the hash prefix for mangled names
+	HashPrefixLength = 6
 )
 
+// FileGenerator handles protobuf to MCP schema generation for a single file
 type FileGenerator struct {
 	f   *protogen.File
 	gen *protogen.Plugin
@@ -45,12 +53,14 @@ type FileGenerator struct {
 	gf *protogen.GeneratedFile
 
 	// messageMap maps from protoreflect.MessageDescriptor to protogen.Message
+	// for efficient lookup of protogen messages from descriptors
 	messageMap map[string]*protogen.Message
 
 	// optionalKeywordSupport when true makes fields required by default unless marked optional
 	optionalKeywordSupport bool
 }
 
+// NewFileGenerator creates a new FileGenerator for the given protobuf file
 func NewFileGenerator(f *protogen.File, gen *protogen.Plugin) *FileGenerator {
 	gen.SupportedFeatures |= uint64(pluginpb.CodeGeneratorResponse_FEATURE_PROTO3_OPTIONAL)
 
@@ -457,11 +467,11 @@ func (g *FileGenerator) messageSchema(md protoreflect.MessageDescriptor) map[str
 }
 
 func (g *FileGenerator) messageSchemaFromDescriptor(md protoreflect.MessageDescriptor, protoMsg *protogen.Message) map[string]any {
-	required := []string{}
+	required := make([]string, 0)
 	// Fields that are not oneOf
-	normalFields := map[string]any{}
+	normalFields := make(map[string]any)
 	// One entry per oneOf block in the message.
-	oneOf := map[string][]map[string]any{}
+	oneOf := make(map[string][]map[string]any)
 
 	// Create a map of field names to comments for lookup
 	fieldComments := g.extractFieldComments(protoMsg)
@@ -480,37 +490,10 @@ func (g *FileGenerator) messageSchemaFromDescriptor(md protoreflect.MessageDescr
 		// OneOf handling - collect oneOf fields for later processing
 		if oneof := nestedFd.ContainingOneof(); oneof != nil && !oneof.IsSynthetic() {
 			oneOfName := string(oneof.Name())
-			if _, ok := oneOf[oneOfName]; !ok {
-				oneOf[oneOfName] = []map[string]any{}
-			}
-
-			// Create a discriminated union entry
-			fieldSchema := g.getTypeWithComment(nestedFd, comment)
-			// Add object_type discriminator property
-			if fieldSchema["properties"] == nil {
-				fieldSchema["properties"] = map[string]any{}
-			}
-			props := fieldSchema["properties"].(map[string]any)
-			props["object_type"] = map[string]any{
-				"type":  "string",
-				"const": name, // The field name becomes the type value
-			}
-
-			variant := map[string]any{
-				"type":       "object",
-				"title":      name,
-				"properties": props,
-				"required":   []string{"object_type"}, // object_type field is always required
-			}
-
-			// Add other required fields from the original schema
-			if originalRequired, ok := fieldSchema["required"]; ok {
-				if reqArray, ok := originalRequired.([]string); ok && len(reqArray) > 0 {
-					variant["required"] = append([]string{"object_type"}, reqArray...)
-				}
-			}
-
-			oneOf[oneOfName] = append(oneOf[oneOfName], variant)
+			g.processOneOfField(nestedFd, comment, name, oneOfName, oneOf,
+				func(fd protoreflect.FieldDescriptor, c string) map[string]any {
+					return g.getTypeWithComment(fd, c)
+				})
 		} else {
 			// If not part of a oneof, handle as a normal field
 			normalFields[name] = g.getTypeWithComment(nestedFd, comment)
@@ -539,11 +522,11 @@ func (g *FileGenerator) messageSchemaFromDescriptor(md protoreflect.MessageDescr
 func (g *FileGenerator) messageSchemaWithDefs(md protoreflect.MessageDescriptor, protoMsg *protogen.Message) map[string]any {
 	defs := make(map[string]any)
 	visiting := make(map[string]bool) // Track types being processed to prevent cycles
-	required := []string{}
+	required := make([]string, 0)
 	// Fields that are not oneOf
-	normalFields := map[string]any{}
+	normalFields := make(map[string]any)
 	// One entry per oneOf block in the message.
-	oneOf := map[string][]map[string]any{}
+	oneOf := make(map[string][]map[string]any)
 
 	// Create a map of field names to comments for lookup
 	fieldComments := g.extractFieldComments(protoMsg)
@@ -562,37 +545,10 @@ func (g *FileGenerator) messageSchemaWithDefs(md protoreflect.MessageDescriptor,
 		// OneOf handling - collect oneOf fields for later processing
 		if oneof := nestedFd.ContainingOneof(); oneof != nil && !oneof.IsSynthetic() {
 			oneOfName := string(oneof.Name())
-			if _, ok := oneOf[oneOfName]; !ok {
-				oneOf[oneOfName] = []map[string]any{}
-			}
-
-			// Create a discriminated union entry
-			fieldSchema := g.getTypeWithDefsAndComment(nestedFd, comment, defs, visiting)
-			// Add object_type discriminator property
-			if fieldSchema["properties"] == nil {
-				fieldSchema["properties"] = map[string]any{}
-			}
-			props := fieldSchema["properties"].(map[string]any)
-			props["object_type"] = map[string]any{
-				"type":  "string",
-				"const": name, // The field name becomes the type value
-			}
-
-			variant := map[string]any{
-				"type":       "object",
-				"title":      name,
-				"properties": props,
-				"required":   []string{"object_type"}, // object_type field is always required
-			}
-
-			// Add other required fields from the original schema
-			if originalRequired, ok := fieldSchema["required"]; ok {
-				if reqArray, ok := originalRequired.([]string); ok && len(reqArray) > 0 {
-					variant["required"] = append([]string{"object_type"}, reqArray...)
-				}
-			}
-
-			oneOf[oneOfName] = append(oneOf[oneOfName], variant)
+			g.processOneOfField(nestedFd, comment, name, oneOfName, oneOf,
+				func(fd protoreflect.FieldDescriptor, c string) map[string]any {
+					return g.getTypeWithDefsAndComment(fd, c, defs, visiting)
+				})
 		} else {
 			// If not part of a oneof, handle as a normal field
 			normalFields[name] = g.getTypeWithDefsAndComment(nestedFd, comment, defs, visiting)
@@ -625,9 +581,9 @@ func (g *FileGenerator) messageSchemaWithDefs(md protoreflect.MessageDescriptor,
 
 // messageSchemaWithDefsInternal generates schema with cycle detection support
 func (g *FileGenerator) messageSchemaWithDefsInternal(md protoreflect.MessageDescriptor, protoMsg *protogen.Message, defs map[string]any, visiting map[string]bool) map[string]any {
-	required := []string{}
-	normalFields := map[string]any{}
-	oneOf := map[string][]map[string]any{}
+	required := make([]string, 0)
+	normalFields := make(map[string]any)
+	oneOf := make(map[string][]map[string]any)
 
 	fieldComments := g.extractFieldComments(protoMsg)
 
@@ -642,34 +598,10 @@ func (g *FileGenerator) messageSchemaWithDefsInternal(md protoreflect.MessageDes
 
 		if oneof := nestedFd.ContainingOneof(); oneof != nil && !oneof.IsSynthetic() {
 			oneOfName := string(oneof.Name())
-			if _, ok := oneOf[oneOfName]; !ok {
-				oneOf[oneOfName] = []map[string]any{}
-			}
-
-			fieldSchema := g.getTypeWithDefsAndComment(nestedFd, comment, defs, visiting)
-			if fieldSchema["properties"] == nil {
-				fieldSchema["properties"] = map[string]any{}
-			}
-			props := fieldSchema["properties"].(map[string]any)
-			props["object_type"] = map[string]any{
-				"type":  "string",
-				"const": name,
-			}
-
-			variant := map[string]any{
-				"type":       "object",
-				"title":      name,
-				"properties": props,
-				"required":   []string{"object_type"},
-			}
-
-			if originalRequired, ok := fieldSchema["required"]; ok {
-				if reqArray, ok := originalRequired.([]string); ok && len(reqArray) > 0 {
-					variant["required"] = append([]string{"object_type"}, reqArray...)
-				}
-			}
-
-			oneOf[oneOfName] = append(oneOf[oneOfName], variant)
+			g.processOneOfField(nestedFd, comment, name, oneOfName, oneOf,
+				func(fd protoreflect.FieldDescriptor, c string) map[string]any {
+					return g.getTypeWithDefsAndComment(fd, c, defs, visiting)
+				})
 		} else {
 			normalFields[name] = g.getTypeWithDefsAndComment(nestedFd, comment, defs, visiting)
 			if g.isFieldRequiredWithOptionalSupport(nestedFd) {
@@ -694,6 +626,54 @@ func (g *FileGenerator) messageSchemaWithDefsInternal(md protoreflect.MessageDes
 // messageSchemaFromDescriptorWithDefs generates schema for nested messages with cycle detection
 func (g *FileGenerator) messageSchemaFromDescriptorWithDefs(md protoreflect.MessageDescriptor, protoMsg *protogen.Message, defs map[string]any, visiting map[string]bool) map[string]any {
 	return g.messageSchemaWithDefsInternal(md, protoMsg, defs, visiting)
+}
+
+// processOneOfField handles the creation of oneOf schema variants with proper type assertions
+func (g *FileGenerator) processOneOfField(
+	nestedFd protoreflect.FieldDescriptor,
+	comment string,
+	name string,
+	oneOfName string,
+	oneOf map[string][]map[string]any,
+	getSchemaFunc func(protoreflect.FieldDescriptor, string) map[string]any,
+) {
+	if _, ok := oneOf[oneOfName]; !ok {
+		oneOf[oneOfName] = []map[string]any{}
+	}
+
+	// Create a discriminated union entry
+	fieldSchema := getSchemaFunc(nestedFd, comment)
+
+	// Safely handle properties
+	if fieldSchema["properties"] == nil {
+		fieldSchema["properties"] = map[string]any{}
+	}
+	props, ok := fieldSchema["properties"].(map[string]any)
+	if !ok {
+		props = map[string]any{}
+		fieldSchema["properties"] = props
+	}
+
+	props["object_type"] = map[string]any{
+		"type":  "string",
+		"const": name,
+	}
+
+	variant := map[string]any{
+		"type":       "object",
+		"title":      name,
+		"properties": props,
+		"required":   []string{"object_type"},
+	}
+
+	// Add other required fields from the original schema
+	if originalRequired, ok := fieldSchema["required"]; ok {
+		if reqArray, ok := originalRequired.([]string); ok && len(reqArray) > 0 {
+			variant["required"] = append([]string{"object_type"}, reqArray...)
+		}
+	}
+
+	oneOf[oneOfName] = append(oneOf[oneOfName], variant)
 }
 
 // getTypeWithComment generates a schema for a field with an optional comment
@@ -913,11 +893,14 @@ outer:
 	return strings.Join(cleanedLines, "\n")
 }
 
+// Base32String converts bytes to base32 string representation
 func Base32String(b []byte) string {
 	n := new(big.Int).SetBytes(b)
 	return n.Text(36)
 }
 
+// MangleHeadIfTooLong truncates and mangles long names to fit within maxLen
+// while preserving uniqueness through a hash prefix
 func MangleHeadIfTooLong(name string, maxLen int) string {
 	if len(name) <= maxLen {
 		// Just sanitize the original name if it's short enough
@@ -926,7 +909,7 @@ func MangleHeadIfTooLong(name string, maxLen int) string {
 
 	// Generate short hash of full name
 	hash := sha1.Sum([]byte(name))
-	hashPrefix := Base32String(hash[:])[:6] // e.g. "3fj92a"
+	hashPrefix := Base32String(hash[:])[:HashPrefixLength] // e.g. "3fj92a"
 
 	// Leave room for hash prefix + underscore
 	available := maxLen - len(hashPrefix) - 1
@@ -945,14 +928,14 @@ func MangleHeadIfTooLong(name string, maxLen int) string {
 // sanitizeForGemini ensures the name complies with Gemini tool name restrictions:
 // - Must start with a letter or underscore
 // - Only alphanumeric, underscores, dots, colons, or dashes allowed
-// - Maximum length of 64 characters
+// - Maximum length of MaxToolNameLength characters
 func sanitizeForGemini(name string) string {
 	if len(name) == 0 {
 		return "tool"
 	}
 
 	var result strings.Builder
-	result.Grow(minInt(len(name), 64))
+	result.Grow(minInt(len(name), MaxToolNameLength))
 
 	for _, r := range name {
 		switch {
@@ -967,8 +950,8 @@ func sanitizeForGemini(name string) string {
 			// Skip invalid characters
 		}
 
-		// Stop at 64 characters
-		if result.Len() >= 64 {
+		// Stop at MaxToolNameLength characters
+		if result.Len() >= MaxToolNameLength {
 			break
 		}
 	}
@@ -983,8 +966,8 @@ func sanitizeForGemini(name string) string {
 	finalName = ensureValidStart(finalName)
 
 	// Trim to max length
-	if len(finalName) > 64 {
-		finalName = finalName[:64]
+	if len(finalName) > MaxToolNameLength {
+		finalName = finalName[:MaxToolNameLength]
 	}
 
 	return finalName
@@ -1041,10 +1024,12 @@ func capitalizeFirstLetter(s string) string {
 	return s
 }
 
+// Generate generates MCP server code for the protobuf file
 func (g *FileGenerator) Generate(packageSuffix string) {
 	g.GenerateWithOptions(packageSuffix, false)
 }
 
+// GenerateWithOptions generates MCP server code with additional options
 func (g *FileGenerator) GenerateWithOptions(packageSuffix string, optionalKeywordSupport bool) {
 	g.optionalKeywordSupport = optionalKeywordSupport
 	file := g.f
@@ -1104,12 +1089,13 @@ func (g *FileGenerator) GenerateWithOptions(packageSuffix string, optionalKeywor
 			schema := g.messageSchemaWithDefs(meth.Input.Desc, meth.Input)
 			marshaled, err := json.Marshal(schema)
 			if err != nil {
-				panic(err)
+				g.gen.Error(fmt.Errorf("failed to marshal JSON schema for %s: %w", meth.Desc.FullName(), err))
+				continue
 			}
 
 			// Create simple tool
 			tool := SimpleTool{
-				Name:        MangleHeadIfTooLong(strings.ReplaceAll(string(meth.Desc.FullName()), ".", "_"), 64),
+				Name:        MangleHeadIfTooLong(strings.ReplaceAll(string(meth.Desc.FullName()), ".", "_"), MaxToolNameLength),
 				Description: cleanComment(string(meth.Comments.Leading)),
 				JSONSchema:  string(marshaled),
 			}
