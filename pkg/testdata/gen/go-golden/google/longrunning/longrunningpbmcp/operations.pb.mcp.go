@@ -126,17 +126,25 @@ func OperationsTransformOneOfFieldsRecursive(obj interface{}) {
 				if unionObj, ok := value.(map[string]interface{}); ok {
 					if typeField, hasType := unionObj["object_type"]; hasType {
 						if typeStr, ok := typeField.(string); ok {
-							// Create a new object without the object_type field
-							variantObj := make(map[string]interface{})
-							for k, val := range unionObj {
-								if k != "object_type" {
-									variantObj[k] = val
+							// First try to extract the field that matches the object_type
+							// (for message types with $ref)
+							if fieldValue, hasField := unionObj[typeStr]; hasField {
+								// Move the field value directly to the parent level
+								v[typeStr] = fieldValue
+								delete(v, key)
+							} else {
+								// Fall back to old logic: create object without object_type field
+								// (for primitive types or inline objects)
+								variantObj := make(map[string]interface{})
+								for k, val := range unionObj {
+									if k != "object_type" {
+										variantObj[k] = val
+									}
 								}
+								// Replace the union object with the variant object
+								v[typeStr] = variantObj
+								delete(v, key)
 							}
-
-							// Replace the union object with the variant object
-							v[typeStr] = variantObj
-							delete(v, key)
 						}
 					}
 				}
