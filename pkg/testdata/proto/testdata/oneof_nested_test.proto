@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package testdata;
+
+option go_package = "github.com/shaders/protoc-gen-go-mcp/pkg/testdata/gen/go/testdata";
+
+// Service to test oneOf with nested message types
+service OneOfNestedTestService {
+  rpc GrantDeviceDataModificationRightOnApplication(GrantDeviceDataModificationRightOnApplicationRequest) returns (GrantDeviceDataModificationRightOnApplicationResponse);
+}
+
+// Request message with oneOf containing nested message
+message GrantDeviceDataModificationRightOnApplicationRequest {
+  message DeviceDataApplications {
+    string application_code = 1;
+  }
+
+  oneof kind {
+    DeviceDataApplications device_data_applications = 1;
+  }
+}
+
+// Response message
+message GrantDeviceDataModificationRightOnApplicationResponse {
+  bool success = 1;
+}

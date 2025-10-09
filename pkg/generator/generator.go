@@ -644,36 +644,57 @@ func (g *FileGenerator) processOneOfField(
 	// Create a discriminated union entry
 	fieldSchema := getSchemaFunc(nestedFd, comment)
 
-	// Safely handle properties
-	if fieldSchema["properties"] == nil {
-		fieldSchema["properties"] = map[string]any{}
-	}
-	props, ok := fieldSchema["properties"].(map[string]any)
-	if !ok {
-		props = map[string]any{}
-		fieldSchema["properties"] = props
-	}
-
-	props["object_type"] = map[string]any{
-		"type":  "string",
-		"const": name,
-	}
-
-	variant := map[string]any{
-		"type":       "object",
-		"title":      name,
-		"properties": props,
-		"required":   []string{"object_type"},
-	}
-
-	// Add other required fields from the original schema
-	if originalRequired, ok := fieldSchema["required"]; ok {
-		if reqArray, ok := originalRequired.([]string); ok && len(reqArray) > 0 {
-			variant["required"] = append([]string{"object_type"}, reqArray...)
+	// Check if the field schema is a $ref (for message types)
+	if _, isRef := fieldSchema["$ref"]; isRef {
+		// For message types, create properties with the field and object_type
+		props := map[string]any{
+			name: fieldSchema, // Include the field with its $ref
+			"object_type": map[string]any{
+				"type":  "string",
+				"const": name,
+			},
 		}
-	}
 
-	oneOf[oneOfName] = append(oneOf[oneOfName], variant)
+		variant := map[string]any{
+			"type":       "object",
+			"title":      name,
+			"properties": props,
+			"required":   []string{"object_type", name},
+		}
+
+		oneOf[oneOfName] = append(oneOf[oneOfName], variant)
+	} else {
+		// For non-message types, handle properties normally
+		if fieldSchema["properties"] == nil {
+			fieldSchema["properties"] = map[string]any{}
+		}
+		props, ok := fieldSchema["properties"].(map[string]any)
+		if !ok {
+			props = map[string]any{}
+			fieldSchema["properties"] = props
+		}
+
+		props["object_type"] = map[string]any{
+			"type":  "string",
+			"const": name,
+		}
+
+		variant := map[string]any{
+			"type":       "object",
+			"title":      name,
+			"properties": props,
+			"required":   []string{"object_type"},
+		}
+
+		// Add other required fields from the original schema
+		if originalRequired, ok := fieldSchema["required"]; ok {
+			if reqArray, ok := originalRequired.([]string); ok && len(reqArray) > 0 {
+				variant["required"] = append([]string{"object_type"}, reqArray...)
+			}
+		}
+
+		oneOf[oneOfName] = append(oneOf[oneOfName], variant)
+	}
 }
 
 // getTypeWithComment generates a schema for a field with an optional comment
