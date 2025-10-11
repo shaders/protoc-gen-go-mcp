@@ -571,15 +571,11 @@ func (g *FileGenerator) processOneOfField(
 		}
 
 		oneOf[oneOfName] = append(oneOf[oneOfName], variant)
-	} else {
-		// For non-message types, handle properties normally
-		if fieldSchema["properties"] == nil {
-			fieldSchema["properties"] = map[string]any{}
-		}
+	} else if _, hasProperties := fieldSchema["properties"]; hasProperties {
+		// For inline objects with properties (nested object schemas)
 		props, ok := fieldSchema["properties"].(map[string]any)
 		if !ok {
 			props = map[string]any{}
-			fieldSchema["properties"] = props
 		}
 
 		props["object_type"] = map[string]any{
@@ -599,6 +595,25 @@ func (g *FileGenerator) processOneOfField(
 			if reqArray, ok := originalRequired.([]string); ok && len(reqArray) > 0 {
 				variant["required"] = append([]string{"object_type"}, reqArray...)
 			}
+		}
+
+		oneOf[oneOfName] = append(oneOf[oneOfName], variant)
+	} else {
+		// For primitive types (boolean, string, number, etc.) or arrays
+		// Create a new object with the field and object_type
+		props := map[string]any{
+			name: fieldSchema, // Include the primitive field with its schema
+			"object_type": map[string]any{
+				"type":  "string",
+				"const": name,
+			},
+		}
+
+		variant := map[string]any{
+			"type":       "object",
+			"title":      name,
+			"properties": props,
+			"required":   []string{"object_type", name},
 		}
 
 		oneOf[oneOfName] = append(oneOf[oneOfName], variant)
