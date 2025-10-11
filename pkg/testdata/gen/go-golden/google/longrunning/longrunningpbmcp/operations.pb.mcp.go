@@ -25,7 +25,7 @@ var (
 	Operations_CancelOperationTool = runtime.Tool{Name: "google_longrunning_Operations_CancelOperation", Description: "Starts asynchronous cancellation on a long-running operation.  The server\nmakes a best effort to cancel the operation, but success is not\nguaranteed.  If the server doesn't support this method, it returns\n`google.rpc.Code.UNIMPLEMENTED`.  Clients can use\n[Operations.GetOperation][google.longrunning.Operations.GetOperation] or\nother methods to check whether the cancellation succeeded or whether the\noperation completed despite cancellation. On successful cancellation,\nthe operation is not deleted; instead, it becomes an operation with\nan [Operation.error][google.longrunning.Operation.error] value with a\n[google.rpc.Status.code][google.rpc.Status.code] of `1`, corresponding to\n`Code.CANCELLED`.\n", JSONSchema: "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"properties\":{\"name\":{\"description\":\"The name of the operation resource to be cancelled.\",\"type\":\"string\"}},\"required\":[],\"type\":\"object\"}"}
 	Operations_DeleteOperationTool = runtime.Tool{Name: "google_longrunning_Operations_DeleteOperation", Description: "Deletes a long-running operation. This method indicates that the client is\nno longer interested in the operation result. It does not cancel the\noperation. If the server doesn't support this method, it returns\n`google.rpc.Code.UNIMPLEMENTED`.\n", JSONSchema: "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"properties\":{\"name\":{\"description\":\"The name of the operation resource to be deleted.\",\"type\":\"string\"}},\"required\":[],\"type\":\"object\"}"}
 	Operations_GetOperationTool    = runtime.Tool{Name: "google_longrunning_Operations_GetOperation", Description: "Gets the latest state of a long-running operation.  Clients can use this\nmethod to poll the operation result at intervals as recommended by the API\nservice.\n", JSONSchema: "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"properties\":{\"name\":{\"description\":\"The name of the operation resource.\",\"type\":\"string\"}},\"required\":[],\"type\":\"object\"}"}
-	Operations_ListOperationsTool  = runtime.Tool{Name: "google_longrunning_Operations_ListOperations", Description: "Lists operations that match the specified filter in the request. If the\nserver doesn't support this method, it returns `UNIMPLEMENTED`.\n", JSONSchema: "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"properties\":{\"filter\":{\"description\":\"The standard list filter.\",\"type\":\"string\"},\"name\":{\"description\":\"The name of the operation's parent resource.\",\"type\":\"string\"},\"page_size\":{\"description\":\"The standard list page size.\",\"type\":\"integer\"},\"page_token\":{\"description\":\"The standard list page token.\",\"type\":\"string\"}},\"required\":[],\"type\":\"object\"}"}
+	Operations_ListOperationsTool  = runtime.Tool{Name: "google_longrunning_Operations_ListOperations", Description: "Lists operations that match the specified filter in the request. If the\nserver doesn't support this method, it returns `UNIMPLEMENTED`.\n", JSONSchema: "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"properties\":{\"filter\":{\"description\":\"The standard list filter.\",\"type\":\"string\"},\"name\":{\"description\":\"The name of the operation's parent resource.\",\"type\":\"string\"},\"page_size\":{\"description\":\"The standard list page size.\",\"type\":\"integer\"},\"page_token\":{\"description\":\"The standard list page token.\",\"type\":\"string\"},\"return_partial_success\":{\"description\":\"When set to `true`, operations that are reachable are returned as normal,\\nand those that are unreachable are returned in the\\n[ListOperationsResponse.unreachable] field.\\n\\nThis can only be `true` when reading across collections e.g. when `parent`\\nis set to `\\\"projects/example/locations/-\\\"`.\\n\\nThis field is not by default supported and will result in an\\n`UNIMPLEMENTED` error if set unless explicitly documented otherwise in\\nservice or product specific documentation.\",\"type\":\"boolean\"}},\"required\":[],\"type\":\"object\"}"}
 	Operations_WaitOperationTool   = runtime.Tool{Name: "google_longrunning_Operations_WaitOperation", Description: "Waits until the specified long-running operation is done or reaches at most\na specified timeout, returning the latest state.  If the operation is\nalready done, the latest state is immediately returned.  If the timeout\nspecified is greater than the default HTTP/RPC timeout, the HTTP/RPC\ntimeout is used.  If the server does not support this method, it returns\n`google.rpc.Code.UNIMPLEMENTED`.\nNote that this method is on a best-effort basis.  It may return the latest\nstate before the specified timeout (including immediately), meaning even an\nimmediate response is no guarantee that the operation is done.\n", JSONSchema: "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"properties\":{\"name\":{\"description\":\"The name of the operation resource to wait on.\",\"type\":\"string\"},\"timeout\":{\"description\":\"The maximum duration to wait before timing out. If left blank, the wait\\nwill be at most the time permitted by the underlying HTTP/RPC protocol.\\nIf RPC context deadline is also specified, the shorter one will be used.\",\"pattern\":\"^-?[0-9]+(\\\\.[0-9]+)?s$\",\"type\":[\"string\",\"null\"]}},\"required\":[],\"type\":\"object\"}"}
 )
 
@@ -38,58 +38,40 @@ type OperationsClient interface {
 	WaitOperation(ctx context.Context, req *longrunningpb.WaitOperationRequest, opts ...grpc.CallOption) (*longrunningpb.Operation, error)
 }
 
-// TODO: BUG: https://github.com/anthropics/claude-code/issues/3084
-// OperationsNormalizeTopLevelJSONStringsForOneofs scans m's top level and, for keys that are members
-// of any (or selected) oneof(s) in the given proto message type, it will parse string values
-// that look like JSON and replace them with the parsed value.
-// If oneofNames is empty, all oneofs are considered. Otherwise only the named oneofs are used.
+// OperationsNormalizeTopLevelJSONStringsForOneofs scans m's top level and, for keys that end with
+// "OneOfType" (as defined in the tool's JSON schema), it will parse string values that look like JSON
+// and replace them with the parsed value.
 func OperationsNormalizeTopLevelJSONStringsForOneofs(
 	m map[string]interface{},
-	msg proto.Message,
-	oneofNames ...string,
+	toolSchema string,
 ) (changed bool) {
-	if m == nil || msg == nil {
+	if m == nil || toolSchema == "" {
 		return false
 	}
 
-	md := msg.ProtoReflect().Descriptor()
-	// Build a set of target oneof descriptors
-	var targetOneofs map[protoreflect.OneofDescriptor]struct{}
-	if len(oneofNames) > 0 {
-		targetOneofs = map[protoreflect.OneofDescriptor]struct{}{}
-	outer:
-		for i := 0; i < md.Oneofs().Len(); i++ {
-			od := md.Oneofs().Get(i)
-			for _, name := range oneofNames {
-				if string(od.Name()) == name {
-					targetOneofs[od] = struct{}{}
-					continue outer
-				}
-			}
+	// Parse the tool schema to find OneOfType fields
+	var schema map[string]interface{}
+	if err := json.Unmarshal([]byte(toolSchema), &schema); err != nil {
+		return false
+	}
+
+	// Extract properties from the schema
+	properties, ok := schema["properties"].(map[string]interface{})
+	if !ok {
+		return false
+	}
+
+	// Find all fields ending with "OneOfType"
+	oneOfTypeFields := map[string]struct{}{}
+	for fieldName := range properties {
+		if strings.HasSuffix(fieldName, "OneOfType") {
+			oneOfTypeFields[fieldName] = struct{}{}
 		}
 	}
 
-	// Collect JSON names of fields that belong to the target oneof(s)
-	jsonNames := map[string]struct{}{}
-	for i := 0; i < md.Fields().Len(); i++ {
-		fd := md.Fields().Get(i)
-		if fd.ContainingOneof() == nil {
-			continue
-		}
-		if targetOneofs != nil {
-			if _, ok := targetOneofs[fd.ContainingOneof()]; !ok {
-				continue
-			}
-		}
-		// fd.JSONName() is the canonical JSON field name ("cat", "dog", ...)
-		jsonNames[fd.JSONName()] = struct{}{}
-		// Also consider the proto field name in case your map uses snake_case
-		jsonNames[string(fd.Name())] = struct{}{}
-	}
-
-	// Rewrite top-level stringified JSON for those keys
+	// Rewrite top-level stringified JSON for OneOfType fields
 	for k, v := range m {
-		if _, ok := jsonNames[k]; !ok {
+		if _, ok := oneOfTypeFields[k]; !ok {
 			continue
 		}
 		s, ok := v.(string)
@@ -188,12 +170,11 @@ func ForwardToOperationsClient(s *mcpserver.MCPServer, client OperationsClient, 
 
 		message := request.GetArguments()
 
+		// Fix oneof's passed as JSON string.
+		_ = OperationsNormalizeTopLevelJSONStringsForOneofs(message, CancelOperationToolDef.JSONSchema)
+
 		// Transform oneOf discriminated unions back to protobuf format
 		OperationsTransformOneOfFields(message)
-
-		// Limit to the "kind" oneof (optional). If you omit it, all oneofs are considered.
-		// TODO: checking that the bug was fixed
-		// _ = OperationsNormalizeTopLevelJSONStringsForOneofs(message, &req, "")
 
 		// Extract extra properties if configured
 		for _, prop := range config.ExtraProperties {
@@ -241,12 +222,11 @@ func ForwardToOperationsClient(s *mcpserver.MCPServer, client OperationsClient, 
 
 		message := request.GetArguments()
 
+		// Fix oneof's passed as JSON string.
+		_ = OperationsNormalizeTopLevelJSONStringsForOneofs(message, DeleteOperationToolDef.JSONSchema)
+
 		// Transform oneOf discriminated unions back to protobuf format
 		OperationsTransformOneOfFields(message)
-
-		// Limit to the "kind" oneof (optional). If you omit it, all oneofs are considered.
-		// TODO: checking that the bug was fixed
-		// _ = OperationsNormalizeTopLevelJSONStringsForOneofs(message, &req, "")
 
 		// Extract extra properties if configured
 		for _, prop := range config.ExtraProperties {
@@ -294,12 +274,11 @@ func ForwardToOperationsClient(s *mcpserver.MCPServer, client OperationsClient, 
 
 		message := request.GetArguments()
 
+		// Fix oneof's passed as JSON string.
+		_ = OperationsNormalizeTopLevelJSONStringsForOneofs(message, GetOperationToolDef.JSONSchema)
+
 		// Transform oneOf discriminated unions back to protobuf format
 		OperationsTransformOneOfFields(message)
-
-		// Limit to the "kind" oneof (optional). If you omit it, all oneofs are considered.
-		// TODO: checking that the bug was fixed
-		// _ = OperationsNormalizeTopLevelJSONStringsForOneofs(message, &req, "")
 
 		// Extract extra properties if configured
 		for _, prop := range config.ExtraProperties {
@@ -347,12 +326,11 @@ func ForwardToOperationsClient(s *mcpserver.MCPServer, client OperationsClient, 
 
 		message := request.GetArguments()
 
+		// Fix oneof's passed as JSON string.
+		_ = OperationsNormalizeTopLevelJSONStringsForOneofs(message, ListOperationsToolDef.JSONSchema)
+
 		// Transform oneOf discriminated unions back to protobuf format
 		OperationsTransformOneOfFields(message)
-
-		// Limit to the "kind" oneof (optional). If you omit it, all oneofs are considered.
-		// TODO: checking that the bug was fixed
-		// _ = OperationsNormalizeTopLevelJSONStringsForOneofs(message, &req, "")
 
 		// Extract extra properties if configured
 		for _, prop := range config.ExtraProperties {
@@ -400,12 +378,11 @@ func ForwardToOperationsClient(s *mcpserver.MCPServer, client OperationsClient, 
 
 		message := request.GetArguments()
 
+		// Fix oneof's passed as JSON string.
+		_ = OperationsNormalizeTopLevelJSONStringsForOneofs(message, WaitOperationToolDef.JSONSchema)
+
 		// Transform oneOf discriminated unions back to protobuf format
 		OperationsTransformOneOfFields(message)
-
-		// Limit to the "kind" oneof (optional). If you omit it, all oneofs are considered.
-		// TODO: checking that the bug was fixed
-		// _ = OperationsNormalizeTopLevelJSONStringsForOneofs(message, &req, "")
 
 		// Extract extra properties if configured
 		for _, prop := range config.ExtraProperties {

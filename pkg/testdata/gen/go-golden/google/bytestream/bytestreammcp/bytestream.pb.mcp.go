@@ -29,58 +29,40 @@ type ByteStreamClient interface {
 	QueryWriteStatus(ctx context.Context, req *bytestream.QueryWriteStatusRequest, opts ...grpc.CallOption) (*bytestream.QueryWriteStatusResponse, error)
 }
 
-// TODO: BUG: https://github.com/anthropics/claude-code/issues/3084
-// ByteStreamNormalizeTopLevelJSONStringsForOneofs scans m's top level and, for keys that are members
-// of any (or selected) oneof(s) in the given proto message type, it will parse string values
-// that look like JSON and replace them with the parsed value.
-// If oneofNames is empty, all oneofs are considered. Otherwise only the named oneofs are used.
+// ByteStreamNormalizeTopLevelJSONStringsForOneofs scans m's top level and, for keys that end with
+// "OneOfType" (as defined in the tool's JSON schema), it will parse string values that look like JSON
+// and replace them with the parsed value.
 func ByteStreamNormalizeTopLevelJSONStringsForOneofs(
 	m map[string]interface{},
-	msg proto.Message,
-	oneofNames ...string,
+	toolSchema string,
 ) (changed bool) {
-	if m == nil || msg == nil {
+	if m == nil || toolSchema == "" {
 		return false
 	}
 
-	md := msg.ProtoReflect().Descriptor()
-	// Build a set of target oneof descriptors
-	var targetOneofs map[protoreflect.OneofDescriptor]struct{}
-	if len(oneofNames) > 0 {
-		targetOneofs = map[protoreflect.OneofDescriptor]struct{}{}
-	outer:
-		for i := 0; i < md.Oneofs().Len(); i++ {
-			od := md.Oneofs().Get(i)
-			for _, name := range oneofNames {
-				if string(od.Name()) == name {
-					targetOneofs[od] = struct{}{}
-					continue outer
-				}
-			}
+	// Parse the tool schema to find OneOfType fields
+	var schema map[string]interface{}
+	if err := json.Unmarshal([]byte(toolSchema), &schema); err != nil {
+		return false
+	}
+
+	// Extract properties from the schema
+	properties, ok := schema["properties"].(map[string]interface{})
+	if !ok {
+		return false
+	}
+
+	// Find all fields ending with "OneOfType"
+	oneOfTypeFields := map[string]struct{}{}
+	for fieldName := range properties {
+		if strings.HasSuffix(fieldName, "OneOfType") {
+			oneOfTypeFields[fieldName] = struct{}{}
 		}
 	}
 
-	// Collect JSON names of fields that belong to the target oneof(s)
-	jsonNames := map[string]struct{}{}
-	for i := 0; i < md.Fields().Len(); i++ {
-		fd := md.Fields().Get(i)
-		if fd.ContainingOneof() == nil {
-			continue
-		}
-		if targetOneofs != nil {
-			if _, ok := targetOneofs[fd.ContainingOneof()]; !ok {
-				continue
-			}
-		}
-		// fd.JSONName() is the canonical JSON field name ("cat", "dog", ...)
-		jsonNames[fd.JSONName()] = struct{}{}
-		// Also consider the proto field name in case your map uses snake_case
-		jsonNames[string(fd.Name())] = struct{}{}
-	}
-
-	// Rewrite top-level stringified JSON for those keys
+	// Rewrite top-level stringified JSON for OneOfType fields
 	for k, v := range m {
-		if _, ok := jsonNames[k]; !ok {
+		if _, ok := oneOfTypeFields[k]; !ok {
 			continue
 		}
 		s, ok := v.(string)
@@ -179,12 +161,11 @@ func ForwardToByteStreamClient(s *mcpserver.MCPServer, client ByteStreamClient, 
 
 		message := request.GetArguments()
 
+		// Fix oneof's passed as JSON string.
+		_ = ByteStreamNormalizeTopLevelJSONStringsForOneofs(message, QueryWriteStatusToolDef.JSONSchema)
+
 		// Transform oneOf discriminated unions back to protobuf format
 		ByteStreamTransformOneOfFields(message)
-
-		// Limit to the "kind" oneof (optional). If you omit it, all oneofs are considered.
-		// TODO: checking that the bug was fixed
-		// _ = ByteStreamNormalizeTopLevelJSONStringsForOneofs(message, &req, "")
 
 		// Extract extra properties if configured
 		for _, prop := range config.ExtraProperties {
