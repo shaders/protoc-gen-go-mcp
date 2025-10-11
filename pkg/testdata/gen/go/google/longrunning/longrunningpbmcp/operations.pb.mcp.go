@@ -16,8 +16,6 @@ import (
 	"github.com/shaders/protoc-gen-go-mcp/pkg/runtime"
 	grpc "google.golang.org/grpc"
 	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/reflect/protoreflect"
 	"strings"
 )
 

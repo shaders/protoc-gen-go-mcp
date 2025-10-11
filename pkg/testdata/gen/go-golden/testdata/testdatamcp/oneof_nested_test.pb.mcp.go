@@ -16,8 +16,6 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	grpc "google.golang.org/grpc"
 	"github.com/shaders/protoc-gen-go-mcp/pkg/runtime"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 var (

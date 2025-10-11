@@ -617,6 +617,30 @@ func (g *FileGenerator) getTypeWithDefsAndComment(fd protoreflect.FieldDescripto
 	return schema
 }
 
+// getType generates a schema for a field without using $defs (for testing)
+func (g *FileGenerator) getType(fd protoreflect.FieldDescriptor) map[string]any {
+	// Simplified version without $defs support
+	defs := make(map[string]any)
+	visiting := make(map[string]bool)
+	return g.getTypeWithDefs(fd, defs, visiting)
+}
+
+// messageSchema generates a schema for a message without using $defs (for testing)
+func (g *FileGenerator) messageSchema(md protoreflect.MessageDescriptor) map[string]any {
+	// Simplified version without $defs support
+	defs := make(map[string]any)
+	visiting := make(map[string]bool)
+	return g.messageSchemaWithDefsInternal(md, nil, defs, visiting)
+}
+
+// messageSchemaFromDescriptor generates a schema from descriptor without using $defs (for testing)
+func (g *FileGenerator) messageSchemaFromDescriptor(md protoreflect.MessageDescriptor, protoMsg *protogen.Message) map[string]any {
+	// Simplified version without $defs support
+	defs := make(map[string]any)
+	visiting := make(map[string]bool)
+	return g.messageSchemaWithDefsInternal(md, protoMsg, defs, visiting)
+}
+
 // getTypeWithDefs generates a schema for a field, using $ref for message types
 func (g *FileGenerator) getTypeWithDefs(fd protoreflect.FieldDescriptor, defs map[string]any, visiting map[string]bool) map[string]any {
 	if fd.IsMap() {
@@ -632,9 +656,14 @@ func (g *FileGenerator) getTypeWithDefs(fd protoreflect.FieldDescriptor, defs ma
 			keyConstraints["pattern"] = "^-?(0|[1-9]\\d*)$"
 		}
 
+		// Get the schema for the map value type
+		mapValue := fd.MapValue()
+		valueSchema := g.getTypeWithDefs(mapValue, defs, visiting)
+
 		return map[string]any{
-			"type":          "object",
-			"propertyNames": keyConstraints,
+			"type":                 "object",
+			"propertyNames":        keyConstraints,
+			"additionalProperties": valueSchema,
 		}
 	}
 
@@ -647,7 +676,8 @@ func (g *FileGenerator) getTypeWithDefs(fd protoreflect.FieldDescriptor, defs ma
 
 		// Check if this is a well-known type
 		if wktSchema, ok := wellKnownTypeSchemas[fullName]; ok {
-			schema = wktSchema
+			// Deep copy to avoid mutating the shared schema
+			schema = deepCopySchema(wktSchema)
 		} else {
 			// Use simple name for the definition key
 			defName := string(md.Name())
@@ -705,6 +735,41 @@ func (g *FileGenerator) getTypeWithDefs(fd protoreflect.FieldDescriptor, defs ma
 		}
 	}
 	return schema
+}
+
+// deepCopySchema creates a deep copy of a schema map to avoid mutation of shared schemas
+func deepCopySchema(schema map[string]any) map[string]any {
+	if schema == nil {
+		return nil
+	}
+
+	result := make(map[string]any, len(schema))
+	for k, v := range schema {
+		switch val := v.(type) {
+		case map[string]any:
+			result[k] = deepCopySchema(val)
+		case []string:
+			// Deep copy string slices
+			copied := make([]string, len(val))
+			copy(copied, val)
+			result[k] = copied
+		case []any:
+			// Deep copy any slices
+			copied := make([]any, len(val))
+			for i, item := range val {
+				if itemMap, ok := item.(map[string]any); ok {
+					copied[i] = deepCopySchema(itemMap)
+				} else {
+					copied[i] = item
+				}
+			}
+			result[k] = copied
+		default:
+			// Primitive types (string, int, bool, etc.) can be copied directly
+			result[k] = v
+		}
+	}
+	return result
 }
 
 var (
