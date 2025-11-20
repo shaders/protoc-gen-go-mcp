@@ -330,6 +330,15 @@ func ForwardTo{{$key}}Client(s *mcpserver.MCPServer, client {{$key}}Client, opts
     if err != nil {
       return nil, err
     }
+
+    // Optionally compress to TOON format if configured
+    if config.UseToonCompression {
+      if toonData, toonErr := runtime.CompressToToon(marshaled); toonErr == nil {
+        return mcp.NewToolResultText(toonData), nil
+      }
+      // Fall back to JSON if TOON compression fails
+    }
+
     return mcp.NewToolResultText(string(marshaled)), nil
   })
   {{- end }}

@@ -25,13 +25,22 @@ type ExtraProperty struct {
 }
 
 type config struct {
-	ExtraProperties []ExtraProperty
+	ExtraProperties    []ExtraProperty
+	UseToonCompression bool
 }
 
 // WithExtraProperties adds extra properties to tool schemas and extracts them from request arguments
 func WithExtraProperties(properties ...ExtraProperty) Option {
 	return func(c *config) {
 		c.ExtraProperties = append(c.ExtraProperties, properties...)
+	}
+}
+
+// WithToonCompression enables TOON format compression for tool results
+// TOON (Token-Oriented Object Notation) reduces token count by ~40% for LLM inputs
+func WithToonCompression(enable bool) Option {
+	return func(c *config) {
+		c.UseToonCompression = enable
 	}
 }
 

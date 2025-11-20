@@ -7,8 +7,8 @@ toolchain go1.24.5
 require (
 	github.com/mark3labs/mcp-go v0.37.0
 	github.com/onsi/gomega v1.37.0
-	github.com/openai/openai-go v1.5.0
 	github.com/redpanda-data/common-go/api v0.0.0-20250801174835-9eea07f1ea06
+	github.com/toon-format/toon-go v0.0.0-20251108125615-44b4cd22477f
 	google.golang.org/genproto/googleapis/api v0.0.0-20250603155806-513f23925822
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250603155806-513f23925822
 	google.golang.org/grpc v1.73.0
@@ -190,10 +190,6 @@ require (
 	github.com/subosito/gotenv v1.4.1 // indirect
 	github.com/tdakkota/asciicheck v0.4.1 // indirect
 	github.com/tetafro/godot v1.5.1 // indirect
-	github.com/tidwall/gjson v1.14.4 // indirect
-	github.com/tidwall/match v1.1.1 // indirect
-	github.com/tidwall/pretty v1.2.1 // indirect
-	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/timakin/bodyclose v0.0.0-20241222091800-1db5c5ca4d67 // indirect
 	github.com/timonwong/loggercheck v0.11.0 // indirect
 	github.com/tomarrell/wrapcheck/v2 v2.11.0 // indirect
