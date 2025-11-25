@@ -31,10 +31,11 @@ type TestServiceClient interface {
 	ProcessWellKnownTypes(ctx context.Context, req *testdata.ProcessWellKnownTypesRequest, opts ...grpc.CallOption) (*testdata.ProcessWellKnownTypesResponse, error)
 }
 
-// TestServiceNormalizeTopLevelJSONStringsForOneofs scans m's top level and, for keys that end with
-// "OneOfType" (as defined in the tool's JSON schema), it will parse string values that look like JSON
-// and replace them with the parsed value.
-func TestServiceNormalizeTopLevelJSONStringsForOneofs(
+// TestServiceNormalizeTopLevelJSONStrings scans m's top level and checks if any fields
+// that should be objects according to the JSON schema are actually strings. If so, it will
+// parse string values that look like JSON and replace them with the parsed value.
+// This handles both OneOf fields and regular object fields.
+func TestServiceNormalizeTopLevelJSONStrings(
 	m map[string]interface{},
 	toolSchema string,
 ) (changed bool) {
@@ -42,7 +43,7 @@ func TestServiceNormalizeTopLevelJSONStringsForOneofs(
 		return false
 	}
 
-	// Parse the tool schema to find OneOfType fields
+	// Parse the tool schema
 	var schema map[string]interface{}
 	if err := json.Unmarshal([]byte(toolSchema), &schema); err != nil {
 		return false
@@ -54,31 +55,76 @@ func TestServiceNormalizeTopLevelJSONStringsForOneofs(
 		return false
 	}
 
-	// Find all fields ending with "OneOfType"
-	oneOfTypeFields := map[string]struct{}{}
-	for fieldName := range properties {
-		if strings.HasSuffix(fieldName, "OneOfType") {
-			oneOfTypeFields[fieldName] = struct{}{}
+	// Helper function to check if a schema defines an object type
+	isObjectSchema := func(propSchema map[string]interface{}) bool {
+		// Check if type is "object"
+		if typeVal, ok := propSchema["type"]; ok {
+			if typeStr, ok := typeVal.(string); ok && typeStr == "object" {
+				return true
+			}
+			// Could also be an array of types
+			if typeArr, ok := typeVal.([]interface{}); ok {
+				for _, t := range typeArr {
+					if tStr, ok := t.(string); ok && tStr == "object" {
+						return true
+					}
+				}
+			}
 		}
+
+		// Check if it has properties (inline object)
+		if _, hasProps := propSchema["properties"]; hasProps {
+			return true
+		}
+
+		// Check if it has a $ref (reference to object)
+		if _, hasRef := propSchema["$ref"]; hasRef {
+			return true
+		}
+
+		// Check if it has oneOf (discriminated union - treated as object)
+		if _, hasOneOf := propSchema["oneOf"]; hasOneOf {
+			return true
+		}
+
+		return false
 	}
 
-	// Rewrite top-level stringified JSON for OneOfType fields
+	// Iterate through all top-level fields in the payload
 	for k, v := range m {
-		if _, ok := oneOfTypeFields[k]; !ok {
+		// Get the schema for this field
+		propSchema, ok := properties[k]
+		if !ok {
 			continue
 		}
+
+		propSchemaMap, ok := propSchema.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		// Check if this field should be an object according to the schema
+		if !isObjectSchema(propSchemaMap) {
+			continue
+		}
+
+		// Check if the actual value is a string
 		s, ok := v.(string)
 		if !ok {
 			continue
 		}
+
+		// Try to parse it as JSON
 		trim := strings.TrimSpace(s)
 		if trim == "" || !(strings.HasPrefix(trim, "{") || strings.HasPrefix(trim, "[")) {
 			continue
 		}
+
 		var parsed any
 		if err := json.Unmarshal([]byte(trim), &parsed); err != nil {
 			continue // ignore if it's not valid JSON
 		}
+
 		m[k] = parsed
 		changed = true
 	}
@@ -163,8 +209,8 @@ func ForwardToTestServiceClient(s *mcpserver.MCPServer, client TestServiceClient
 
 		message := request.GetArguments()
 
-		// Fix oneof's passed as JSON string.
-		_ = TestServiceNormalizeTopLevelJSONStringsForOneofs(message, CreateItemToolDef.JSONSchema)
+		// Normalize JSON strings for object fields (including oneOf's).
+		_ = TestServiceNormalizeTopLevelJSONStrings(message, CreateItemToolDef.JSONSchema)
 
 		// Transform oneOf discriminated unions back to protobuf format
 		TestServiceTransformOneOfFields(message)
@@ -215,8 +261,8 @@ func ForwardToTestServiceClient(s *mcpserver.MCPServer, client TestServiceClient
 
 		message := request.GetArguments()
 
-		// Fix oneof's passed as JSON string.
-		_ = TestServiceNormalizeTopLevelJSONStringsForOneofs(message, GetItemToolDef.JSONSchema)
+		// Normalize JSON strings for object fields (including oneOf's).
+		_ = TestServiceNormalizeTopLevelJSONStrings(message, GetItemToolDef.JSONSchema)
 
 		// Transform oneOf discriminated unions back to protobuf format
 		TestServiceTransformOneOfFields(message)
@@ -267,8 +313,8 @@ func ForwardToTestServiceClient(s *mcpserver.MCPServer, client TestServiceClient
 
 		message := request.GetArguments()
 
-		// Fix oneof's passed as JSON string.
-		_ = TestServiceNormalizeTopLevelJSONStringsForOneofs(message, ProcessWellKnownTypesToolDef.JSONSchema)
+		// Normalize JSON strings for object fields (including oneOf's).
+		_ = TestServiceNormalizeTopLevelJSONStrings(message, ProcessWellKnownTypesToolDef.JSONSchema)
 
 		// Transform oneOf discriminated unions back to protobuf format
 		TestServiceTransformOneOfFields(message)
