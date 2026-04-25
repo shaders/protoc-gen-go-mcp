@@ -340,10 +340,12 @@ func TestFullGeneration(t *testing.T) {
 	err = os.Chdir(testdataDir)
 	g.Expect(err).ToNot(HaveOccurred())
 
+	const optionsExclude = "--exclude-path=proto/mcp/options/options.proto"
+
 	if *updateGolden {
 		// Generate golden files
 		t.Logf("Generating golden files...")
-		cmd := exec.Command("buf", "generate", "--template", "buf.gen.golden.yaml")
+		cmd := exec.Command("buf", "generate", "--template", "buf.gen.golden.yaml", optionsExclude)
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			t.Fatalf("Failed to generate golden files: %v\nOutput: %s", err, output)
@@ -363,7 +365,7 @@ func TestFullGeneration(t *testing.T) {
 
 	// Generate current files
 	t.Logf("Generating current files...")
-	cmd := exec.Command("buf", "generate")
+	cmd := exec.Command("buf", "generate", optionsExclude)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("Failed to generate current files: %v\nOutput: %s", err, output)

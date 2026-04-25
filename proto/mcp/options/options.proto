@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package mcp.options;
+
+import "google/protobuf/descriptor.proto";
+
+option go_package = "github.com/shaders/protoc-gen-go-mcp/pkg/options;options";
+
+extend google.protobuf.FieldOptions {
+  // Marks an integer field as zero-based in the underlying gRPC API,
+  // but presented as one-based in the MCP tool schema.
+  // The generated MCP wrapper will decrement the value by 1 before
+  // forwarding to gRPC, and the JSON-Schema will set minimum=1 and
+  // adjust the description.
+  bool zero_based_pagination = 52001;
+}

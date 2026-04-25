@@ -9,17 +9,21 @@ import (
 
 import (
 	"context"
-	"strings"
+	"encoding/json"
 	"github.com/mark3labs/mcp-go/mcp"
 	mcpserver "github.com/mark3labs/mcp-go/server"
-	"encoding/json"
-	"google.golang.org/protobuf/encoding/protojson"
-	grpc "google.golang.org/grpc"
 	"github.com/shaders/protoc-gen-go-mcp/pkg/runtime"
+	grpc "google.golang.org/grpc"
+	"google.golang.org/protobuf/encoding/protojson"
+	"strings"
 )
 
 var (
 	OneOfNestedTestService_GrantDeviceDataModificationRightOnApplicationTool = runtime.Tool{Name: "phpt1g_TestService_GrantDeviceDataModificationRightOnApplication", Description: "", JSONSchema: "{\"$defs\":{\"DeviceDataApplications\":{\"properties\":{\"application_code\":{\"type\":\"string\"}},\"required\":[],\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"properties\":{\"kindOneOfType\":{\"oneOf\":[{\"properties\":{\"device_data_applications\":{\"$ref\":\"#/$defs/DeviceDataApplications\"},\"object_type\":{\"const\":\"device_data_applications\",\"type\":\"string\"}},\"required\":[\"object_type\",\"device_data_applications\"],\"title\":\"device_data_applications\",\"type\":\"object\"}]}},\"required\":[\"kindOneOfType\"],\"type\":\"object\"}"}
+)
+
+var (
+	OneOfNestedTestService_GrantDeviceDataModificationRightOnApplicationZeroBasedPaginationPaths = [][]string{}
 )
 
 // OneOfNestedTestServiceClient is compatible with the grpc-go client interface.
@@ -211,6 +215,9 @@ func ForwardToOneOfNestedTestServiceClient(s *mcpserver.MCPServer, client OneOfN
 		// Transform oneOf discriminated unions back to protobuf format
 		OneOfNestedTestServiceTransformOneOfFields(message)
 
+		// Decrement values for fields annotated with (mcp.options.zero_based_pagination)
+		runtime.AdjustZeroBasedPaginationFields(message, OneOfNestedTestService_GrantDeviceDataModificationRightOnApplicationZeroBasedPaginationPaths)
+
 		// Extract extra properties if configured
 		for _, prop := range config.ExtraProperties {
 			if propVal, ok := message[prop.Name]; ok {
@@ -236,6 +243,15 @@ func ForwardToOneOfNestedTestServiceClient(s *mcpserver.MCPServer, client OneOfN
 		if err != nil {
 			return nil, err
 		}
+
+		// Optionally compress to TOON format if configured
+		if config.UseToonCompression {
+			if toonData, toonErr := runtime.CompressToToon(marshaled); toonErr == nil {
+				return mcp.NewToolResultText(toonData), nil
+			}
+			// Fall back to JSON if TOON compression fails
+		}
+
 		return mcp.NewToolResultText(string(marshaled)), nil
 	})
 }

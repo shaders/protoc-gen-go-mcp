@@ -149,6 +149,26 @@ message FilterExpression {
 }
 ```
 
+### Annotation: `zero_based_pagination`
+
+If your gRPC API uses 0-based pagination (`page=0` is the first page), LLM clients tend to send `page=1` for the first page anyway. The `(mcp.options.zero_based_pagination) = true` annotation lets you keep your protobuf 0-based for production gRPC traffic while presenting an LLM-friendly 1-based view through the MCP wrapper.
+
+```protobuf
+import "mcp/options/options.proto";
+
+message ListItemsRequest {
+  // Page number (0-based).
+  int32 page = 1 [(mcp.options.zero_based_pagination) = true];
+}
+```
+
+This makes the generator:
+
+- Set `"minimum": 1` on the field in the generated JSON schema and rewrite the description to read as 1-based.
+- Decrement the value by 1 inside the generated MCP handler before forwarding the request to gRPC. Values <= 0 are clamped to 0 so a non-compliant client never produces a negative index.
+
+The annotation is defined in `proto/mcp/options/options.proto` and the Go counterpart in `github.com/shaders/protoc-gen-go-mcp/pkg/options`. Other clients (REST, control panels, regular gRPC consumers) see the protobuf untouched.
+
 ### Wiring up with gRPC client
 
 It is also possible to directly forward MCP tool calls to gRPC clients. Follows gRPC-Gateway pattern.

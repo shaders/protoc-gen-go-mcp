@@ -9,19 +9,25 @@ import (
 
 import (
 	"context"
-	"strings"
+	"encoding/json"
 	"github.com/mark3labs/mcp-go/mcp"
 	mcpserver "github.com/mark3labs/mcp-go/server"
-	"encoding/json"
-	"google.golang.org/protobuf/encoding/protojson"
-	grpc "google.golang.org/grpc"
 	"github.com/shaders/protoc-gen-go-mcp/pkg/runtime"
+	grpc "google.golang.org/grpc"
+	"google.golang.org/protobuf/encoding/protojson"
+	"strings"
 )
 
 var (
 	TestService_CreateItemTool            = runtime.Tool{Name: "testdata_TestService_CreateItem", Description: "CreateItem creates a new item\n", JSONSchema: "{\"$defs\":{\"ProductDetails\":{\"properties\":{\"price\":{\"description\":\"Product price in dollars\",\"type\":\"number\"},\"quantity\":{\"description\":\"Available quantity\",\"type\":\"integer\"}},\"required\":[],\"type\":\"object\"},\"ServiceDetails\":{\"properties\":{\"duration\":{\"description\":\"Service duration (e.g. \\\"1h\\\", \\\"30m\\\")\",\"type\":\"string\"},\"recurring\":{\"description\":\"Whether this is a recurring service\",\"type\":\"boolean\"}},\"required\":[],\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"properties\":{\"description\":{\"description\":\"Optional field\",\"type\":\"string\"},\"item_typeOneOfType\":{\"oneOf\":[{\"properties\":{\"object_type\":{\"const\":\"product\",\"type\":\"string\"},\"product\":{\"$ref\":\"#/$defs/ProductDetails\"}},\"required\":[\"object_type\",\"product\"],\"title\":\"product\",\"type\":\"object\"},{\"properties\":{\"object_type\":{\"const\":\"service\",\"type\":\"string\"},\"service\":{\"$ref\":\"#/$defs/ServiceDetails\"}},\"required\":[\"object_type\",\"service\"],\"title\":\"service\",\"type\":\"object\"}]},\"labels\":{\"additionalProperties\":{\"type\":\"string\"},\"description\":\"Map field\",\"propertyNames\":{\"type\":\"string\"},\"type\":\"object\"},\"name\":{\"description\":\"Required field\",\"type\":\"string\"},\"tags\":{\"description\":\"Repeated field\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"thumbnail\":{\"contentEncoding\":\"base64\",\"description\":\"Bytes field\",\"format\":\"byte\",\"type\":\"string\"}},\"required\":[\"name\",\"item_typeOneOfType\"],\"type\":\"object\"}"}
 	TestService_GetItemTool               = runtime.Tool{Name: "testdata_TestService_GetItem", Description: "GetItem retrieves an item by ID\n", JSONSchema: "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"properties\":{\"id\":{\"type\":\"string\"}},\"required\":[],\"type\":\"object\"}"}
 	TestService_ProcessWellKnownTypesTool = runtime.Tool{Name: "testdata_TestService_ProcessWellKnownTypes", Description: "Test well-known types handling\n", JSONSchema: "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"properties\":{\"config\":{\"description\":\"represents a google.protobuf.Value, a dynamic JSON value (string, number, boolean, array, object).\"},\"metadata\":{\"description\":\"Well-known types that need special handling\",\"type\":\"object\"},\"payload\":{\"properties\":{\"@type\":{\"type\":\"string\"},\"value\":{}},\"required\":[\"@type\"],\"type\":[\"object\",\"null\"]},\"timestamp\":{\"format\":\"date-time\",\"type\":[\"string\",\"null\"]}},\"required\":[],\"type\":\"object\"}"}
+)
+
+var (
+	TestService_CreateItemZeroBasedPaginationPaths            = [][]string{}
+	TestService_GetItemZeroBasedPaginationPaths               = [][]string{}
+	TestService_ProcessWellKnownTypesZeroBasedPaginationPaths = [][]string{}
 )
 
 // TestServiceClient is compatible with the grpc-go client interface.
@@ -215,6 +221,9 @@ func ForwardToTestServiceClient(s *mcpserver.MCPServer, client TestServiceClient
 		// Transform oneOf discriminated unions back to protobuf format
 		TestServiceTransformOneOfFields(message)
 
+		// Decrement values for fields annotated with (mcp.options.zero_based_pagination)
+		runtime.AdjustZeroBasedPaginationFields(message, TestService_CreateItemZeroBasedPaginationPaths)
+
 		// Extract extra properties if configured
 		for _, prop := range config.ExtraProperties {
 			if propVal, ok := message[prop.Name]; ok {
@@ -240,6 +249,15 @@ func ForwardToTestServiceClient(s *mcpserver.MCPServer, client TestServiceClient
 		if err != nil {
 			return nil, err
 		}
+
+		// Optionally compress to TOON format if configured
+		if config.UseToonCompression {
+			if toonData, toonErr := runtime.CompressToToon(marshaled); toonErr == nil {
+				return mcp.NewToolResultText(toonData), nil
+			}
+			// Fall back to JSON if TOON compression fails
+		}
+
 		return mcp.NewToolResultText(string(marshaled)), nil
 	})
 	GetItemToolDef := TestService_GetItemTool
@@ -267,6 +285,9 @@ func ForwardToTestServiceClient(s *mcpserver.MCPServer, client TestServiceClient
 		// Transform oneOf discriminated unions back to protobuf format
 		TestServiceTransformOneOfFields(message)
 
+		// Decrement values for fields annotated with (mcp.options.zero_based_pagination)
+		runtime.AdjustZeroBasedPaginationFields(message, TestService_GetItemZeroBasedPaginationPaths)
+
 		// Extract extra properties if configured
 		for _, prop := range config.ExtraProperties {
 			if propVal, ok := message[prop.Name]; ok {
@@ -292,6 +313,15 @@ func ForwardToTestServiceClient(s *mcpserver.MCPServer, client TestServiceClient
 		if err != nil {
 			return nil, err
 		}
+
+		// Optionally compress to TOON format if configured
+		if config.UseToonCompression {
+			if toonData, toonErr := runtime.CompressToToon(marshaled); toonErr == nil {
+				return mcp.NewToolResultText(toonData), nil
+			}
+			// Fall back to JSON if TOON compression fails
+		}
+
 		return mcp.NewToolResultText(string(marshaled)), nil
 	})
 	ProcessWellKnownTypesToolDef := TestService_ProcessWellKnownTypesTool
@@ -319,6 +349,9 @@ func ForwardToTestServiceClient(s *mcpserver.MCPServer, client TestServiceClient
 		// Transform oneOf discriminated unions back to protobuf format
 		TestServiceTransformOneOfFields(message)
 
+		// Decrement values for fields annotated with (mcp.options.zero_based_pagination)
+		runtime.AdjustZeroBasedPaginationFields(message, TestService_ProcessWellKnownTypesZeroBasedPaginationPaths)
+
 		// Extract extra properties if configured
 		for _, prop := range config.ExtraProperties {
 			if propVal, ok := message[prop.Name]; ok {
@@ -344,6 +377,15 @@ func ForwardToTestServiceClient(s *mcpserver.MCPServer, client TestServiceClient
 		if err != nil {
 			return nil, err
 		}
+
+		// Optionally compress to TOON format if configured
+		if config.UseToonCompression {
+			if toonData, toonErr := runtime.CompressToToon(marshaled); toonErr == nil {
+				return mcp.NewToolResultText(toonData), nil
+			}
+			// Fall back to JSON if TOON compression fails
+		}
+
 		return mcp.NewToolResultText(string(marshaled)), nil
 	})
 }

@@ -32,6 +32,8 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/pluginpb"
+
+	mcpoptions "github.com/shaders/protoc-gen-go-mcp/pkg/options"
 )
 
 const (
@@ -145,6 +147,12 @@ import (
 var (
 {{- range $key, $val := .Tools }}
   {{$key}}Tool = runtime.Tool{Name: {{ printf "%q" $val.Name }}, Description: {{ printf "%q" $val.Description }}, JSONSchema: {{ printf "%q" $val.JSONSchema }}}
+{{- end }}
+)
+
+var (
+{{- range $key, $val := .Tools }}
+  {{$key}}ZeroBasedPaginationPaths = [][]string{ {{- range $path := $val.ZeroBasedPaginationPaths }}{ {{- range $i, $p := $path }}{{ if $i }}, {{ end }}{{ printf "%q" $p }}{{- end }} }, {{- end }} }
 {{- end }}
 )
 
@@ -351,6 +359,9 @@ func ForwardTo{{$key}}Client(s *mcpserver.MCPServer, client {{$key}}Client, opts
     // Transform oneOf discriminated unions back to protobuf format
     {{$key}}TransformOneOfFields(message)
 
+    // Decrement values for fields annotated with (mcp.options.zero_based_pagination)
+    runtime.AdjustZeroBasedPaginationFields(message, {{$key | capitalizeFirst}}_{{$tool_name}}ZeroBasedPaginationPaths)
+
     // Extract extra properties if configured
     for _, prop := range config.ExtraProperties {
       if propVal, ok := message[prop.Name]; ok {
@@ -407,6 +418,12 @@ type SimpleTool struct {
 	Name        string
 	Description string
 	JSONSchema  string
+
+	// ZeroBasedPaginationPaths lists paths to integer fields annotated with
+	// (mcp.options.zero_based_pagination) = true, expressed as the original
+	// protobuf field names. The runtime decrements each value by 1 before
+	// forwarding the request to gRPC.
+	ZeroBasedPaginationPaths [][]string
 }
 
 // MethodInfo holds information about a service method
@@ -684,7 +701,127 @@ func (g *FileGenerator) getTypeWithDefsAndComment(fd protoreflect.FieldDescripto
 		schema["description"] = trimmed
 	}
 
+	if isZeroBasedPagination(fd) {
+		schema["minimum"] = 1
+		schema["description"] = adjustDescriptionForOneBased(schema["description"])
+	}
+
 	return schema
+}
+
+// isZeroBasedPagination reports whether the field carries the
+// (mcp.options.zero_based_pagination) = true annotation AND is a scalar
+// integer field where the schema/runtime translation actually applies.
+//
+// Annotated repeated, map, message, enum, oneof variants and non-integer
+// scalar fields are silently ignored: there is no single integer value to
+// decrement, so honoring the annotation would mislead the JSON schema
+// (e.g. attaching "minimum": 1 to an array wrapper) without any matching
+// runtime behavior.
+func isZeroBasedPagination(fd protoreflect.FieldDescriptor) bool {
+	if fd.IsList() || fd.IsMap() {
+		return false
+	}
+	if oneOf := fd.ContainingOneof(); oneOf != nil && !oneOf.IsSynthetic() {
+		return false
+	}
+	if !isIntegerKind(fd.Kind()) {
+		return false
+	}
+	opts := fd.Options()
+	if opts == nil {
+		return false
+	}
+	if !proto.HasExtension(opts, mcpoptions.E_ZeroBasedPagination) {
+		return false
+	}
+	v, ok := proto.GetExtension(opts, mcpoptions.E_ZeroBasedPagination).(bool)
+	return ok && v
+}
+
+// isIntegerKind reports whether kind is one of the protobuf integer kinds
+// that kindToType maps to JSON Schema "integer".
+func isIntegerKind(kind protoreflect.Kind) bool {
+	switch kind {
+	case protoreflect.Int32Kind, protoreflect.Sint32Kind, protoreflect.Sfixed32Kind,
+		protoreflect.Uint32Kind, protoreflect.Fixed32Kind,
+		protoreflect.Int64Kind, protoreflect.Sint64Kind, protoreflect.Sfixed64Kind,
+		protoreflect.Uint64Kind, protoreflect.Fixed64Kind:
+		return true
+	}
+	return false
+}
+
+// collectZeroBasedPaginationPaths walks md and returns a list of field paths
+// (proto field names) that carry the zero_based_pagination annotation. It
+// follows nested message fields (with cycle detection) but stops at lists,
+// maps, and oneof fields where pagination decrement does not have a single
+// well-defined target.
+func collectZeroBasedPaginationPaths(md protoreflect.MessageDescriptor) [][]string {
+	var paths [][]string
+	visited := make(map[string]bool)
+	collectZeroBasedPathsInto(md, nil, visited, &paths)
+	return paths
+}
+
+func collectZeroBasedPathsInto(md protoreflect.MessageDescriptor, prefix []string, visited map[string]bool, out *[][]string) {
+	full := string(md.FullName())
+	if visited[full] {
+		return
+	}
+	visited[full] = true
+	defer delete(visited, full)
+
+	fields := md.Fields()
+	for i := 0; i < fields.Len(); i++ {
+		fd := fields.Get(i)
+		name := string(fd.Name())
+
+		if isZeroBasedPagination(fd) {
+			*out = append(*out, appendPath(prefix, name))
+			continue
+		}
+
+		if fd.Kind() != protoreflect.MessageKind || fd.IsList() || fd.IsMap() {
+			continue
+		}
+		if oneOf := fd.ContainingOneof(); oneOf != nil && !oneOf.IsSynthetic() {
+			continue
+		}
+		// Skip well-known types: they have no user-annotated fields.
+		if _, isWKT := wellKnownTypeSchemas[string(fd.Message().FullName())]; isWKT {
+			continue
+		}
+		collectZeroBasedPathsInto(fd.Message(), appendPath(prefix, name), visited, out)
+	}
+}
+
+// appendPath returns prefix + [name] without sharing the backing array.
+func appendPath(prefix []string, name string) []string {
+	out := make([]string, len(prefix)+1)
+	copy(out, prefix)
+	out[len(prefix)] = name
+	return out
+}
+
+// adjustDescriptionForOneBased rewrites a field description so the AI sees the
+// field as 1-based even though the underlying gRPC API is 0-based.
+func adjustDescriptionForOneBased(existing any) string {
+	const oneBasedSuffix = " (1-based; first page is 1, automatically translated to 0-based for the backend)"
+
+	desc, _ := existing.(string)
+	desc = strings.TrimSpace(desc)
+	if desc == "" {
+		return strings.TrimSpace("Page number" + oneBasedSuffix)
+	}
+
+	replaced := strings.ReplaceAll(desc, "0-based", "1-based")
+	replaced = strings.ReplaceAll(replaced, "zero-based", "one-based")
+
+	if replaced != desc {
+		return replaced
+	}
+	return desc + oneBasedSuffix
 }
 
 // getType generates a schema for a field without using $defs (for testing)
@@ -1098,9 +1235,10 @@ func (g *FileGenerator) GenerateWithOptions(packageSuffix string, optionalKeywor
 
 			// Create simple tool
 			tool := SimpleTool{
-				Name:        MangleHeadIfTooLong(strings.ReplaceAll(string(meth.Desc.FullName()), ".", "_"), MaxToolNameLength),
-				Description: cleanComment(string(meth.Comments.Leading)),
-				JSONSchema:  string(marshaled),
+				Name:                     MangleHeadIfTooLong(strings.ReplaceAll(string(meth.Desc.FullName()), ".", "_"), MaxToolNameLength),
+				Description:              cleanComment(string(meth.Comments.Leading)),
+				JSONSchema:               string(marshaled),
+				ZeroBasedPaginationPaths: collectZeroBasedPaginationPaths(meth.Input.Desc),
 			}
 
 			s[meth.GoName] = MethodInfo{

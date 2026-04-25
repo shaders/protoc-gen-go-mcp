@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package testdata;
+
+import "mcp/options/options.proto";
+
+// PaginationService exercises the (mcp.options.zero_based_pagination) annotation.
+service PaginationService {
+  // ListItems returns a page of items. Pagination is 0-based on the wire,
+  // 1-based in the MCP tool schema.
+  rpc ListItems(ListItemsRequest) returns (ListItemsResponse);
+}
+
+message ListItemsRequest {
+  // Page number (0-based). The MCP wrapper accepts a 1-based value and
+  // decrements it before forwarding.
+  int32 page = 1 [(mcp.options.zero_based_pagination) = true];
+
+  // Maximum items per page.
+  int32 page_size = 2;
+
+  // Optional inner query parameters (used to verify nested handling).
+  InnerQuery query = 3;
+
+  // Annotation on a repeated field is silently ignored: there is no single
+  // integer to decrement.
+  repeated int32 ignored_repeated_pages = 4 [(mcp.options.zero_based_pagination) = true];
+
+  // Annotation on a non-integer field is silently ignored.
+  string ignored_string_page = 5 [(mcp.options.zero_based_pagination) = true];
+
+  // Unsigned integer page index, also annotated.
+  uint32 unsigned_page = 6 [(mcp.options.zero_based_pagination) = true];
+}
+
+message InnerQuery {
+  // Inner page number (0-based). Same translation applies.
+  int32 inner_page = 1 [(mcp.options.zero_based_pagination) = true];
+
+  string filter = 2;
+}
+
+message ListItemsResponse {
+  repeated string items = 1;
+  int32 total = 2;
+}
