@@ -807,12 +807,12 @@ func appendPath(prefix []string, name string) []string {
 // adjustDescriptionForOneBased rewrites a field description so the AI sees the
 // field as 1-based even though the underlying gRPC API is 0-based.
 func adjustDescriptionForOneBased(existing any) string {
-	const oneBasedSuffix = " (1-based; first page is 1, automatically translated to 0-based for the backend)"
+	const oneBasedSuffix = " (1-based)"
 
 	desc, _ := existing.(string)
 	desc = strings.TrimSpace(desc)
 	if desc == "" {
-		return strings.TrimSpace("Page number" + oneBasedSuffix)
+		return "Page number" + oneBasedSuffix
 	}
 
 	replaced := strings.ReplaceAll(desc, "0-based", "1-based")
