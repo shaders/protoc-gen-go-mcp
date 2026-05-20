@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	OneOfNestedTestService_GrantDeviceDataModificationRightOnApplicationTool = runtime.Tool{Name: "phpt1g_TestService_GrantDeviceDataModificationRightOnApplication", Description: "", JSONSchema: "{\"$defs\":{\"DeviceDataApplications\":{\"properties\":{\"application_code\":{\"type\":\"string\"}},\"required\":[],\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"properties\":{\"kindOneOfType\":{\"oneOf\":[{\"properties\":{\"device_data_applications\":{\"$ref\":\"#/$defs/DeviceDataApplications\"},\"object_type\":{\"const\":\"device_data_applications\",\"type\":\"string\"}},\"required\":[\"object_type\",\"device_data_applications\"],\"title\":\"device_data_applications\",\"type\":\"object\"}]}},\"required\":[\"kindOneOfType\"],\"type\":\"object\"}"}
+	OneOfNestedTestService_GrantDeviceDataModificationRightOnApplicationTool = runtime.Tool{Name: "phpt1g_TestService_GrantDeviceDataModificationRightOnApplication", Description: "", JSONSchema: "{\"$defs\":{\"DeviceDataApplications\":{\"properties\":{\"application_code\":{\"type\":\"string\"}},\"required\":[],\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"properties\":{\"kindOneOfType\":{\"oneOf\":[{\"properties\":{\"device_data_applications\":{\"$ref\":\"#/$defs/DeviceDataApplications\"},\"object_type\":{\"const\":\"device_data_applications\",\"type\":\"string\"}},\"required\":[\"object_type\",\"device_data_applications\"],\"title\":\"device_data_applications\",\"type\":\"object\"}],\"type\":\"object\"}},\"required\":[\"kindOneOfType\"],\"type\":\"object\"}"}
 )
 
 var (

@@ -119,7 +119,13 @@ func (g *FileGenerator) addOneOfConstraints(normalFields map[string]any, oneOf m
 	for oneOfName, variants := range oneOf {
 		// Add "OneOfType" postfix to the field name
 		fieldName := oneOfName + "OneOfType"
+		// Declare "type": "object" alongside "oneOf" so that strict JSON Schema
+		// consumers (notably Qwen / vLLM tool-call chat templates) do not try to
+		// recurse into the variant list as if it were a property map and crash
+		// with "Can only get item pairs from a mapping". Every variant in the
+		// oneOf list is itself an object, so this is type-safe.
 		normalFields[fieldName] = map[string]any{
+			"type":  "object",
 			"oneOf": variants,
 		}
 		// OneOf fields are mandatory in protobuf, so add to required array

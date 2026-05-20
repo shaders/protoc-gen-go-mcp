@@ -326,6 +326,56 @@ func TestMessageSchemaWithOptionalSupport(t *testing.T) {
 	}
 }
 
+func TestAddOneOfConstraintsHasTypeObject(t *testing.T) {
+	g := NewWithT(t)
+
+	fg := &FileGenerator{}
+
+	normalFields := map[string]any{}
+	oneOf := map[string][]map[string]any{
+		"kind": {
+			{
+				"type":     "object",
+				"title":    "device_data_applications",
+				"required": []string{"object_type", "device_data_applications"},
+				"properties": map[string]any{
+					"object_type": map[string]any{
+						"type":  "string",
+						"const": "device_data_applications",
+					},
+					"device_data_applications": map[string]any{
+						"$ref": "#/$defs/DeviceDataApplications",
+					},
+				},
+			},
+		},
+	}
+
+	required := fg.addOneOfConstraints(normalFields, oneOf, nil)
+
+	g.Expect(required).To(ContainElement("kindOneOfType"),
+		"oneOf field must be added to required list")
+
+	wrapper, ok := normalFields["kindOneOfType"].(map[string]any)
+	g.Expect(ok).To(BeTrue(), "kindOneOfType must be a map[string]any")
+
+	// The bug we are fixing: strict JSON Schema consumers (Qwen/vLLM chat
+	// templates) crash with "Can only get item pairs from a mapping" when a
+	// property declares "oneOf" without "type". Make sure both keys exist.
+	g.Expect(wrapper).To(HaveKeyWithValue("type", "object"),
+		`oneOf wrapper must declare "type":"object" alongside "oneOf"`)
+	g.Expect(wrapper).To(HaveKey("oneOf"),
+		"oneOf wrapper must keep its variants list")
+
+	// Marshal/unmarshal round-trip to ensure the resulting schema is plain JSON.
+	marshaled, err := json.Marshal(normalFields)
+	g.Expect(err).ToNot(HaveOccurred())
+	var decoded map[string]any
+	g.Expect(json.Unmarshal(marshaled, &decoded)).To(Succeed())
+	g.Expect(decoded["kindOneOfType"]).To(HaveKeyWithValue("type", "object"))
+	g.Expect(decoded["kindOneOfType"]).To(HaveKey("oneOf"))
+}
+
 var updateGolden = flag.Bool("update-golden", false, "Update golden files")
 
 func TestFullGeneration(t *testing.T) {
