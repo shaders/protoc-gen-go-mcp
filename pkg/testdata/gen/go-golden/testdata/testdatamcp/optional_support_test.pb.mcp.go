@@ -9,13 +9,13 @@ import (
 
 import (
 	"context"
-	"encoding/json"
+	"strings"
 	"github.com/mark3labs/mcp-go/mcp"
 	mcpserver "github.com/mark3labs/mcp-go/server"
-	"github.com/shaders/protoc-gen-go-mcp/pkg/runtime"
-	grpc "google.golang.org/grpc"
+	"encoding/json"
 	"google.golang.org/protobuf/encoding/protojson"
-	"strings"
+	grpc "google.golang.org/grpc"
+	"github.com/shaders/protoc-gen-go-mcp/pkg/runtime"
 )
 
 var (

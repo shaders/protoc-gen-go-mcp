@@ -11,7 +11,25 @@ type Tool struct {
 	Name        string
 	Description string
 	JSONSchema  string
+
+	// Title is the human-readable tool title emitted into mcp.ToolAnnotation.
+	// Empty means the method carried no (mcp.options.tool) title.
+	Title string
+	// ReadOnly, Destructive, Idempotent and OpenWorld are the MCP behavioral
+	// hints from (mcp.options.tool). A nil hint was not set on the annotation
+	// and is omitted from the emitted mcp.ToolAnnotation, so clients apply the
+	// MCP spec defaults (readOnlyHint=false, destructiveHint=true,
+	// idempotentHint=false, openWorldHint=true). A non-nil hint is emitted
+	// explicitly with the given value.
+	ReadOnly    *bool
+	Destructive *bool
+	Idempotent  *bool
+	OpenWorld   *bool
 }
+
+// BoolPtr returns a pointer to b. Generated code uses it to emit explicitly
+// set tool hints.
+func BoolPtr(b bool) *bool { return &b }
 
 // Option defines functional options for MCP functions
 type Option func(*config)
