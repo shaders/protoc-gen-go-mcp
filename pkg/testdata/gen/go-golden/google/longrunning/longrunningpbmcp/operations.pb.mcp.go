@@ -27,6 +27,14 @@ var (
 	Operations_WaitOperationTool   = runtime.Tool{Name: "google_longrunning_Operations_WaitOperation", Description: "Waits until the specified long-running operation is done or reaches at most\na specified timeout, returning the latest state.  If the operation is\nalready done, the latest state is immediately returned.  If the timeout\nspecified is greater than the default HTTP/RPC timeout, the HTTP/RPC\ntimeout is used.  If the server does not support this method, it returns\n`google.rpc.Code.UNIMPLEMENTED`.\nNote that this method is on a best-effort basis.  It may return the latest\nstate before the specified timeout (including immediately), meaning even an\nimmediate response is no guarantee that the operation is done.\n", JSONSchema: "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"properties\":{\"name\":{\"description\":\"The name of the operation resource to wait on.\",\"type\":\"string\"},\"timeout\":{\"description\":\"The maximum duration to wait before timing out. If left blank, the wait\\nwill be at most the time permitted by the underlying HTTP/RPC protocol.\\nIf RPC context deadline is also specified, the shorter one will be used.\",\"pattern\":\"^-?[0-9]+(\\\\.[0-9]+)?s$\",\"type\":[\"string\",\"null\"]}},\"required\":[],\"type\":\"object\"}"}
 )
 
+var (
+	Operations_CancelOperationZeroBasedPaginationPaths = [][]string{}
+	Operations_DeleteOperationZeroBasedPaginationPaths = [][]string{}
+	Operations_GetOperationZeroBasedPaginationPaths    = [][]string{}
+	Operations_ListOperationsZeroBasedPaginationPaths  = [][]string{}
+	Operations_WaitOperationZeroBasedPaginationPaths   = [][]string{}
+)
+
 // OperationsClient is compatible with the grpc-go client interface.
 type OperationsClient interface {
 	CancelOperation(ctx context.Context, req *longrunningpb.CancelOperationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -220,6 +228,9 @@ func ForwardToOperationsClient(s *mcpserver.MCPServer, client OperationsClient, 
 		// Transform oneOf discriminated unions back to protobuf format
 		OperationsTransformOneOfFields(message)
 
+		// Decrement values for fields annotated with (mcp.options.zero_based_pagination)
+		runtime.AdjustZeroBasedPaginationFields(message, Operations_CancelOperationZeroBasedPaginationPaths)
+
 		// Extract extra properties if configured
 		for _, prop := range config.ExtraProperties {
 			if propVal, ok := message[prop.Name]; ok {
@@ -245,6 +256,15 @@ func ForwardToOperationsClient(s *mcpserver.MCPServer, client OperationsClient, 
 		if err != nil {
 			return nil, err
 		}
+
+		// Optionally compress to TOON format if configured
+		if config.UseToonCompression {
+			if toonData, toonErr := runtime.CompressToToon(marshaled); toonErr == nil {
+				return mcp.NewToolResultText(toonData), nil
+			}
+			// Fall back to JSON if TOON compression fails
+		}
+
 		return mcp.NewToolResultText(string(marshaled)), nil
 	})
 	DeleteOperationToolDef := Operations_DeleteOperationTool
@@ -272,6 +292,9 @@ func ForwardToOperationsClient(s *mcpserver.MCPServer, client OperationsClient, 
 		// Transform oneOf discriminated unions back to protobuf format
 		OperationsTransformOneOfFields(message)
 
+		// Decrement values for fields annotated with (mcp.options.zero_based_pagination)
+		runtime.AdjustZeroBasedPaginationFields(message, Operations_DeleteOperationZeroBasedPaginationPaths)
+
 		// Extract extra properties if configured
 		for _, prop := range config.ExtraProperties {
 			if propVal, ok := message[prop.Name]; ok {
@@ -297,6 +320,15 @@ func ForwardToOperationsClient(s *mcpserver.MCPServer, client OperationsClient, 
 		if err != nil {
 			return nil, err
 		}
+
+		// Optionally compress to TOON format if configured
+		if config.UseToonCompression {
+			if toonData, toonErr := runtime.CompressToToon(marshaled); toonErr == nil {
+				return mcp.NewToolResultText(toonData), nil
+			}
+			// Fall back to JSON if TOON compression fails
+		}
+
 		return mcp.NewToolResultText(string(marshaled)), nil
 	})
 	GetOperationToolDef := Operations_GetOperationTool
@@ -324,6 +356,9 @@ func ForwardToOperationsClient(s *mcpserver.MCPServer, client OperationsClient, 
 		// Transform oneOf discriminated unions back to protobuf format
 		OperationsTransformOneOfFields(message)
 
+		// Decrement values for fields annotated with (mcp.options.zero_based_pagination)
+		runtime.AdjustZeroBasedPaginationFields(message, Operations_GetOperationZeroBasedPaginationPaths)
+
 		// Extract extra properties if configured
 		for _, prop := range config.ExtraProperties {
 			if propVal, ok := message[prop.Name]; ok {
@@ -349,6 +384,15 @@ func ForwardToOperationsClient(s *mcpserver.MCPServer, client OperationsClient, 
 		if err != nil {
 			return nil, err
 		}
+
+		// Optionally compress to TOON format if configured
+		if config.UseToonCompression {
+			if toonData, toonErr := runtime.CompressToToon(marshaled); toonErr == nil {
+				return mcp.NewToolResultText(toonData), nil
+			}
+			// Fall back to JSON if TOON compression fails
+		}
+
 		return mcp.NewToolResultText(string(marshaled)), nil
 	})
 	ListOperationsToolDef := Operations_ListOperationsTool
@@ -376,6 +420,9 @@ func ForwardToOperationsClient(s *mcpserver.MCPServer, client OperationsClient, 
 		// Transform oneOf discriminated unions back to protobuf format
 		OperationsTransformOneOfFields(message)
 
+		// Decrement values for fields annotated with (mcp.options.zero_based_pagination)
+		runtime.AdjustZeroBasedPaginationFields(message, Operations_ListOperationsZeroBasedPaginationPaths)
+
 		// Extract extra properties if configured
 		for _, prop := range config.ExtraProperties {
 			if propVal, ok := message[prop.Name]; ok {
@@ -401,6 +448,15 @@ func ForwardToOperationsClient(s *mcpserver.MCPServer, client OperationsClient, 
 		if err != nil {
 			return nil, err
 		}
+
+		// Optionally compress to TOON format if configured
+		if config.UseToonCompression {
+			if toonData, toonErr := runtime.CompressToToon(marshaled); toonErr == nil {
+				return mcp.NewToolResultText(toonData), nil
+			}
+			// Fall back to JSON if TOON compression fails
+		}
+
 		return mcp.NewToolResultText(string(marshaled)), nil
 	})
 	WaitOperationToolDef := Operations_WaitOperationTool
@@ -428,6 +484,9 @@ func ForwardToOperationsClient(s *mcpserver.MCPServer, client OperationsClient, 
 		// Transform oneOf discriminated unions back to protobuf format
 		OperationsTransformOneOfFields(message)
 
+		// Decrement values for fields annotated with (mcp.options.zero_based_pagination)
+		runtime.AdjustZeroBasedPaginationFields(message, Operations_WaitOperationZeroBasedPaginationPaths)
+
 		// Extract extra properties if configured
 		for _, prop := range config.ExtraProperties {
 			if propVal, ok := message[prop.Name]; ok {
@@ -453,6 +512,15 @@ func ForwardToOperationsClient(s *mcpserver.MCPServer, client OperationsClient, 
 		if err != nil {
 			return nil, err
 		}
+
+		// Optionally compress to TOON format if configured
+		if config.UseToonCompression {
+			if toonData, toonErr := runtime.CompressToToon(marshaled); toonErr == nil {
+				return mcp.NewToolResultText(toonData), nil
+			}
+			// Fall back to JSON if TOON compression fails
+		}
+
 		return mcp.NewToolResultText(string(marshaled)), nil
 	})
 }

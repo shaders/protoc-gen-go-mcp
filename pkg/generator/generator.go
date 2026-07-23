@@ -956,6 +956,7 @@ func (g *FileGenerator) getTypeWithDefs(fd protoreflect.FieldDescriptor, defs ma
 				// We're in a recursive reference, just use $ref without adding to defs
 				schema = map[string]any{
 					"$ref": "#/$defs/" + defName,
+					"type": "object",
 				}
 			} else if _, exists := defs[defName]; !exists {
 				// Mark as visiting to detect cycles
@@ -974,11 +975,13 @@ func (g *FileGenerator) getTypeWithDefs(fd protoreflect.FieldDescriptor, defs ma
 				// Return a $ref to the definition
 				schema = map[string]any{
 					"$ref": "#/$defs/" + defName,
+					"type": "object",
 				}
 			} else {
 				// Already exists in defs, just reference it
 				schema = map[string]any{
 					"$ref": "#/$defs/" + defName,
+					"type": "object",
 				}
 			}
 		}
@@ -1052,19 +1055,23 @@ var (
 			"type": "object",
 		},
 		"google.protobuf.Value": {
+			"type":        []string{"object", "array", "string", "number", "boolean", "null"},
 			"description": "represents a google.protobuf.Value, a dynamic JSON value (string, number, boolean, array, object).",
 		},
 		"google.protobuf.ListValue": {
 			"type":        "array",
 			"description": "represents a google.protobuf.ListValue, a JSON array of values.",
-			"items":       map[string]any{},
+			"items":       map[string]any{"type": []string{"object", "array", "string", "number", "boolean", "null"}},
 		},
 		"google.protobuf.FieldMask": {"type": "string"},
 		"google.protobuf.Any": {
 			"type": []string{"object", "null"},
 			"properties": map[string]any{
 				"@type": map[string]any{"type": "string"},
-				"value": map[string]any{},
+				// protojson uses "value" only when @type is a well-known type,
+				// and its shape depends on that type (string for Timestamp,
+				// object for Struct, ...), so allow the full JSON-type union.
+				"value": map[string]any{"type": []string{"object", "array", "string", "number", "boolean", "null"}},
 			},
 			"required": []string{"@type"},
 		},
