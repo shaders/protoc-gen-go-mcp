@@ -22,6 +22,10 @@ var (
 	ByteStream_QueryWriteStatusTool = runtime.Tool{Name: "google_bytestream_ByteStream_QueryWriteStatus", Description: "`QueryWriteStatus()` is used to find the `committed_size` for a resource\nthat is being written, which can then be used as the `write_offset` for\nthe next `Write()` call.\n\nIf the resource does not exist (i.e., the resource has been deleted, or the\nfirst `Write()` has not yet reached the service), this method returns the\nerror `NOT_FOUND`.\n\nThe client **may** call `QueryWriteStatus()` at any time to determine how\nmuch data has been processed for this resource. This is useful if the\nclient is buffering data and needs to know which data can be safely\nevicted. For any sequence of `QueryWriteStatus()` calls for a given\nresource name, the sequence of returned `committed_size` values will be\nnon-decreasing.\n", JSONSchema: "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"properties\":{\"resource_name\":{\"description\":\"The name of the resource whose write status is being requested.\",\"type\":\"string\"}},\"required\":[],\"type\":\"object\"}"}
 )
 
+var (
+	ByteStream_QueryWriteStatusZeroBasedPaginationPaths = [][]string{}
+)
+
 // ByteStreamClient is compatible with the grpc-go client interface.
 type ByteStreamClient interface {
 	QueryWriteStatus(ctx context.Context, req *bytestream.QueryWriteStatusRequest, opts ...grpc.CallOption) (*bytestream.QueryWriteStatusResponse, error)
@@ -211,6 +215,9 @@ func ForwardToByteStreamClient(s *mcpserver.MCPServer, client ByteStreamClient, 
 		// Transform oneOf discriminated unions back to protobuf format
 		ByteStreamTransformOneOfFields(message)
 
+		// Decrement values for fields annotated with (mcp.options.zero_based_pagination)
+		runtime.AdjustZeroBasedPaginationFields(message, ByteStream_QueryWriteStatusZeroBasedPaginationPaths)
+
 		// Extract extra properties if configured
 		for _, prop := range config.ExtraProperties {
 			if propVal, ok := message[prop.Name]; ok {
@@ -236,6 +243,15 @@ func ForwardToByteStreamClient(s *mcpserver.MCPServer, client ByteStreamClient, 
 		if err != nil {
 			return nil, err
 		}
+
+		// Optionally compress to TOON format if configured
+		if config.UseToonCompression {
+			if toonData, toonErr := runtime.CompressToToon(marshaled); toonErr == nil {
+				return mcp.NewToolResultText(toonData), nil
+			}
+			// Fall back to JSON if TOON compression fails
+		}
+
 		return mcp.NewToolResultText(string(marshaled)), nil
 	})
 }

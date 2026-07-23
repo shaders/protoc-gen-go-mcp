@@ -67,7 +67,7 @@ func TestGetTypeStandard(t *testing.T) {
 			},
 			wantSchema: func(g *WithT, schema map[string]any) {
 				g.Expect(schema["description"]).To(ContainSubstring("dynamic JSON value"))
-				g.Expect(schema).ToNot(HaveKey("type")) // Any type
+				g.Expect(schema["type"]).To(ContainElement("object")) // full JSON-type union
 			},
 		},
 		{
