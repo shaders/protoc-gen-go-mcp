@@ -42,6 +42,18 @@ func TestNormalizeBase64BytesFields(t *testing.T) {
 			want:    map[string]interface{}{"blob": "YWJj"},
 		},
 		{
+			name:    "padded hex digest is indistinguishable from base64 and passes through",
+			schema:  `{"properties":{"blob":{"type":"string","format":"byte"}}}`,
+			message: map[string]interface{}{"blob": "d41d8cd98f00b204e9800998ecf8427e"},
+			want:    map[string]interface{}{"blob": "d41d8cd98f00b204e9800998ecf8427e"},
+		},
+		{
+			name:    "unpadded alphanumeric string is treated as raw",
+			schema:  `{"properties":{"blob":{"type":"string","format":"byte"}}}`,
+			message: map[string]interface{}{"blob": "deadbee"},
+			want:    map[string]interface{}{"blob": "ZGVhZGJlZQ=="},
+		},
+		{
 			name:    "string field is not touched",
 			schema:  `{"properties":{"name":{"type":"string"}}}`,
 			message: map[string]interface{}{"name": "some name"},

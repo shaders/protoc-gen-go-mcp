@@ -130,9 +130,15 @@ func ensureBase64(v interface{}) interface{} {
 }
 
 // looksLikeBase64 reports whether s uses only the base64 alphabet (standard or
-// URL-safe) and decodes cleanly. Empty counts as encoded. Padding is required:
-// the unpadded encodings accept short raw words like "abc" and would leave them
-// unencoded.
+// URL-safe) and decodes cleanly. Empty counts as encoded.
+//
+// The alphanumeric zone is intrinsically ambiguous — a hex digest like
+// "deadbeef" is indistinguishable from a client's base64 payload — so such input
+// is passed through, exactly as protojson already decoded it before this walk
+// existed. Padding is required, which is what splits the ambiguous zone: an
+// unpadded alphanumeric string is treated as raw and encoded, so what the model
+// wrote survives. Raw content with any character outside the alphabet (JSON,
+// PEM, files — the case this exists for) is unaffected by either rule.
 func looksLikeBase64(s string) bool {
 	if s == "" {
 		return true
