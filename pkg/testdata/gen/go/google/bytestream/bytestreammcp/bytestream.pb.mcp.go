@@ -212,6 +212,10 @@ func ForwardToByteStreamClient(s *mcpserver.MCPServer, client ByteStreamClient, 
 		// Normalize JSON strings for object fields (including oneOf's).
 		_ = ByteStreamNormalizeTopLevelJSONStrings(message, QueryWriteStatusToolDef.JSONSchema)
 
+		// Base64-encode raw values supplied for bytes fields. Runs before the oneOf
+		// transform, while the message still has the shape the schema describes.
+		runtime.NormalizeBase64BytesFields(message, QueryWriteStatusToolDef.JSONSchema)
+
 		// Transform oneOf discriminated unions back to protobuf format
 		ByteStreamTransformOneOfFields(message)
 

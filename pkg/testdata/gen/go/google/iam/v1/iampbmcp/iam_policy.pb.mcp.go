@@ -218,6 +218,10 @@ func ForwardToIAMPolicyClient(s *mcpserver.MCPServer, client IAMPolicyClient, op
 		// Normalize JSON strings for object fields (including oneOf's).
 		_ = IAMPolicyNormalizeTopLevelJSONStrings(message, GetIamPolicyToolDef.JSONSchema)
 
+		// Base64-encode raw values supplied for bytes fields. Runs before the oneOf
+		// transform, while the message still has the shape the schema describes.
+		runtime.NormalizeBase64BytesFields(message, GetIamPolicyToolDef.JSONSchema)
+
 		// Transform oneOf discriminated unions back to protobuf format
 		IAMPolicyTransformOneOfFields(message)
 
@@ -282,6 +286,10 @@ func ForwardToIAMPolicyClient(s *mcpserver.MCPServer, client IAMPolicyClient, op
 		// Normalize JSON strings for object fields (including oneOf's).
 		_ = IAMPolicyNormalizeTopLevelJSONStrings(message, SetIamPolicyToolDef.JSONSchema)
 
+		// Base64-encode raw values supplied for bytes fields. Runs before the oneOf
+		// transform, while the message still has the shape the schema describes.
+		runtime.NormalizeBase64BytesFields(message, SetIamPolicyToolDef.JSONSchema)
+
 		// Transform oneOf discriminated unions back to protobuf format
 		IAMPolicyTransformOneOfFields(message)
 
@@ -345,6 +353,10 @@ func ForwardToIAMPolicyClient(s *mcpserver.MCPServer, client IAMPolicyClient, op
 
 		// Normalize JSON strings for object fields (including oneOf's).
 		_ = IAMPolicyNormalizeTopLevelJSONStrings(message, TestIamPermissionsToolDef.JSONSchema)
+
+		// Base64-encode raw values supplied for bytes fields. Runs before the oneOf
+		// transform, while the message still has the shape the schema describes.
+		runtime.NormalizeBase64BytesFields(message, TestIamPermissionsToolDef.JSONSchema)
 
 		// Transform oneOf discriminated unions back to protobuf format
 		IAMPolicyTransformOneOfFields(message)

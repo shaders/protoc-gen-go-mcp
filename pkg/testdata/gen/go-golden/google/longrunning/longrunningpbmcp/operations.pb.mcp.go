@@ -225,6 +225,10 @@ func ForwardToOperationsClient(s *mcpserver.MCPServer, client OperationsClient, 
 		// Normalize JSON strings for object fields (including oneOf's).
 		_ = OperationsNormalizeTopLevelJSONStrings(message, CancelOperationToolDef.JSONSchema)
 
+		// Base64-encode raw values supplied for bytes fields. Runs before the oneOf
+		// transform, while the message still has the shape the schema describes.
+		runtime.NormalizeBase64BytesFields(message, CancelOperationToolDef.JSONSchema)
+
 		// Transform oneOf discriminated unions back to protobuf format
 		OperationsTransformOneOfFields(message)
 
@@ -288,6 +292,10 @@ func ForwardToOperationsClient(s *mcpserver.MCPServer, client OperationsClient, 
 
 		// Normalize JSON strings for object fields (including oneOf's).
 		_ = OperationsNormalizeTopLevelJSONStrings(message, DeleteOperationToolDef.JSONSchema)
+
+		// Base64-encode raw values supplied for bytes fields. Runs before the oneOf
+		// transform, while the message still has the shape the schema describes.
+		runtime.NormalizeBase64BytesFields(message, DeleteOperationToolDef.JSONSchema)
 
 		// Transform oneOf discriminated unions back to protobuf format
 		OperationsTransformOneOfFields(message)
@@ -353,6 +361,10 @@ func ForwardToOperationsClient(s *mcpserver.MCPServer, client OperationsClient, 
 		// Normalize JSON strings for object fields (including oneOf's).
 		_ = OperationsNormalizeTopLevelJSONStrings(message, GetOperationToolDef.JSONSchema)
 
+		// Base64-encode raw values supplied for bytes fields. Runs before the oneOf
+		// transform, while the message still has the shape the schema describes.
+		runtime.NormalizeBase64BytesFields(message, GetOperationToolDef.JSONSchema)
+
 		// Transform oneOf discriminated unions back to protobuf format
 		OperationsTransformOneOfFields(message)
 
@@ -417,6 +429,10 @@ func ForwardToOperationsClient(s *mcpserver.MCPServer, client OperationsClient, 
 		// Normalize JSON strings for object fields (including oneOf's).
 		_ = OperationsNormalizeTopLevelJSONStrings(message, ListOperationsToolDef.JSONSchema)
 
+		// Base64-encode raw values supplied for bytes fields. Runs before the oneOf
+		// transform, while the message still has the shape the schema describes.
+		runtime.NormalizeBase64BytesFields(message, ListOperationsToolDef.JSONSchema)
+
 		// Transform oneOf discriminated unions back to protobuf format
 		OperationsTransformOneOfFields(message)
 
@@ -480,6 +496,10 @@ func ForwardToOperationsClient(s *mcpserver.MCPServer, client OperationsClient, 
 
 		// Normalize JSON strings for object fields (including oneOf's).
 		_ = OperationsNormalizeTopLevelJSONStrings(message, WaitOperationToolDef.JSONSchema)
+
+		// Base64-encode raw values supplied for bytes fields. Runs before the oneOf
+		// transform, while the message still has the shape the schema describes.
+		runtime.NormalizeBase64BytesFields(message, WaitOperationToolDef.JSONSchema)
 
 		// Transform oneOf discriminated unions back to protobuf format
 		OperationsTransformOneOfFields(message)

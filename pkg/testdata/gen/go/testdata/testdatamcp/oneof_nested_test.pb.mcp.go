@@ -212,6 +212,10 @@ func ForwardToOneOfNestedTestServiceClient(s *mcpserver.MCPServer, client OneOfN
 		// Normalize JSON strings for object fields (including oneOf's).
 		_ = OneOfNestedTestServiceNormalizeTopLevelJSONStrings(message, GrantDeviceDataModificationRightOnApplicationToolDef.JSONSchema)
 
+		// Base64-encode raw values supplied for bytes fields. Runs before the oneOf
+		// transform, while the message still has the shape the schema describes.
+		runtime.NormalizeBase64BytesFields(message, GrantDeviceDataModificationRightOnApplicationToolDef.JSONSchema)
+
 		// Transform oneOf discriminated unions back to protobuf format
 		OneOfNestedTestServiceTransformOneOfFields(message)
 

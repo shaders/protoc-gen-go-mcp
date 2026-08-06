@@ -212,6 +212,10 @@ func ForwardToPaginationServiceClient(s *mcpserver.MCPServer, client PaginationS
 		// Normalize JSON strings for object fields (including oneOf's).
 		_ = PaginationServiceNormalizeTopLevelJSONStrings(message, ListItemsToolDef.JSONSchema)
 
+		// Base64-encode raw values supplied for bytes fields. Runs before the oneOf
+		// transform, while the message still has the shape the schema describes.
+		runtime.NormalizeBase64BytesFields(message, ListItemsToolDef.JSONSchema)
+
 		// Transform oneOf discriminated unions back to protobuf format
 		PaginationServiceTransformOneOfFields(message)
 
