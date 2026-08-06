@@ -225,6 +225,10 @@ func ForwardToAnnotatedServiceClient(s *mcpserver.MCPServer, client AnnotatedSer
 		// Normalize JSON strings for object fields (including oneOf's).
 		_ = AnnotatedServiceNormalizeTopLevelJSONStrings(message, DeleteWidgetToolDef.JSONSchema)
 
+		// Base64-encode raw values supplied for bytes fields. Runs before the oneOf
+		// transform, while the message still has the shape the schema describes.
+		runtime.NormalizeBase64BytesFields(message, DeleteWidgetToolDef.JSONSchema)
+
 		// Transform oneOf discriminated unions back to protobuf format
 		AnnotatedServiceTransformOneOfFields(message)
 
@@ -296,6 +300,10 @@ func ForwardToAnnotatedServiceClient(s *mcpserver.MCPServer, client AnnotatedSer
 		// Normalize JSON strings for object fields (including oneOf's).
 		_ = AnnotatedServiceNormalizeTopLevelJSONStrings(message, GetWidgetToolDef.JSONSchema)
 
+		// Base64-encode raw values supplied for bytes fields. Runs before the oneOf
+		// transform, while the message still has the shape the schema describes.
+		runtime.NormalizeBase64BytesFields(message, GetWidgetToolDef.JSONSchema)
+
 		// Transform oneOf discriminated unions back to protobuf format
 		AnnotatedServiceTransformOneOfFields(message)
 
@@ -359,6 +367,10 @@ func ForwardToAnnotatedServiceClient(s *mcpserver.MCPServer, client AnnotatedSer
 
 		// Normalize JSON strings for object fields (including oneOf's).
 		_ = AnnotatedServiceNormalizeTopLevelJSONStrings(message, ListLegacyToolDef.JSONSchema)
+
+		// Base64-encode raw values supplied for bytes fields. Runs before the oneOf
+		// transform, while the message still has the shape the schema describes.
+		runtime.NormalizeBase64BytesFields(message, ListLegacyToolDef.JSONSchema)
 
 		// Transform oneOf discriminated unions back to protobuf format
 		AnnotatedServiceTransformOneOfFields(message)

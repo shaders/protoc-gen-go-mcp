@@ -218,6 +218,10 @@ func ForwardToTestServiceClient(s *mcpserver.MCPServer, client TestServiceClient
 		// Normalize JSON strings for object fields (including oneOf's).
 		_ = TestServiceNormalizeTopLevelJSONStrings(message, CreateItemToolDef.JSONSchema)
 
+		// Base64-encode raw values supplied for bytes fields. Runs before the oneOf
+		// transform, while the message still has the shape the schema describes.
+		runtime.NormalizeBase64BytesFields(message, CreateItemToolDef.JSONSchema)
+
 		// Transform oneOf discriminated unions back to protobuf format
 		TestServiceTransformOneOfFields(message)
 
@@ -282,6 +286,10 @@ func ForwardToTestServiceClient(s *mcpserver.MCPServer, client TestServiceClient
 		// Normalize JSON strings for object fields (including oneOf's).
 		_ = TestServiceNormalizeTopLevelJSONStrings(message, GetItemToolDef.JSONSchema)
 
+		// Base64-encode raw values supplied for bytes fields. Runs before the oneOf
+		// transform, while the message still has the shape the schema describes.
+		runtime.NormalizeBase64BytesFields(message, GetItemToolDef.JSONSchema)
+
 		// Transform oneOf discriminated unions back to protobuf format
 		TestServiceTransformOneOfFields(message)
 
@@ -345,6 +353,10 @@ func ForwardToTestServiceClient(s *mcpserver.MCPServer, client TestServiceClient
 
 		// Normalize JSON strings for object fields (including oneOf's).
 		_ = TestServiceNormalizeTopLevelJSONStrings(message, ProcessWellKnownTypesToolDef.JSONSchema)
+
+		// Base64-encode raw values supplied for bytes fields. Runs before the oneOf
+		// transform, while the message still has the shape the schema describes.
+		runtime.NormalizeBase64BytesFields(message, ProcessWellKnownTypesToolDef.JSONSchema)
 
 		// Transform oneOf discriminated unions back to protobuf format
 		TestServiceTransformOneOfFields(message)

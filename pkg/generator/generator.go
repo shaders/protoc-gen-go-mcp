@@ -398,6 +398,10 @@ func ForwardTo{{$key}}Client(s *mcpserver.MCPServer, client {{$key}}Client, opts
     // Normalize JSON strings for object fields (including oneOf's).
     _ = {{$key}}NormalizeTopLevelJSONStrings(message, {{$tool_name}}ToolDef.JSONSchema)
 
+    // Base64-encode raw values supplied for bytes fields. Runs before the oneOf
+    // transform, while the message still has the shape the schema describes.
+    runtime.NormalizeBase64BytesFields(message, {{$tool_name}}ToolDef.JSONSchema)
+
     // Transform oneOf discriminated unions back to protobuf format
     {{$key}}TransformOneOfFields(message)
 
