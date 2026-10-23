@@ -19,10 +19,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"go/token"
+	"maps"
 	"math/big"
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"text/template"
 	"unicode"
@@ -74,6 +76,10 @@ type FileGenerator struct {
 	// generation run so that a duplicate name fails the build. It is shared
 	// between FileGenerators; always non-nil once generation starts.
 	seenToolNames ToolNameRegistry
+
+	// outputMode makes schema generation describe the protojson-encoded
+	// response (plain oneof fields, 64-bit integers as strings) instead of tool arguments.
+	outputMode bool
 }
 
 // ToolNameEntry records which method claimed a tool name and whether the name
@@ -142,8 +148,9 @@ func (g *FileGenerator) getEnumSchema(ed protoreflect.EnumDescriptor) map[string
 
 // addOneOfConstraints adds simplified oneOf fields to the schema properties and marks them as required
 func (g *FileGenerator) addOneOfConstraints(normalFields map[string]any, oneOf map[string][]map[string]any, required []string) []string {
-	// For each oneOf group, add a oneOf field to properties
-	for oneOfName, variants := range oneOf {
+	// Sorted so that the emitted "required" order is stable across runs.
+	for _, oneOfName := range slices.Sorted(maps.Keys(oneOf)) {
+		variants := oneOf[oneOfName]
 		// Add "OneOfType" postfix to the field name
 		fieldName := oneOfName + "OneOfType"
 		// Declare "type": "object" alongside "oneOf" so that strict JSON Schema
@@ -179,7 +186,7 @@ import (
 
 var (
 {{- range $key, $val := .Tools }}
-  {{$key}}Tool = runtime.Tool{Name: {{ printf "%q" $val.Name }}, Description: {{ printf "%q" $val.Description }}, JSONSchema: {{ printf "%q" $val.JSONSchema }}{{ if $val.Title }}, Title: {{ printf "%q" $val.Title }}{{ end }}{{ if $val.ReadOnly }}, ReadOnly: runtime.BoolPtr({{ $val.ReadOnly }}){{ end }}{{ if $val.Destructive }}, Destructive: runtime.BoolPtr({{ $val.Destructive }}){{ end }}{{ if $val.Idempotent }}, Idempotent: runtime.BoolPtr({{ $val.Idempotent }}){{ end }}{{ if $val.OpenWorld }}, OpenWorld: runtime.BoolPtr({{ $val.OpenWorld }}){{ end }}}
+  {{$key}}Tool = runtime.Tool{Name: {{ printf "%q" $val.Name }}, Description: {{ printf "%q" $val.Description }}, JSONSchema: {{ printf "%q" $val.JSONSchema }}{{ if $val.OutputSchema }}, OutputSchema: {{ printf "%q" $val.OutputSchema }}{{ end }}{{ if $val.Title }}, Title: {{ printf "%q" $val.Title }}{{ end }}{{ if $val.ReadOnly }}, ReadOnly: runtime.BoolPtr({{ $val.ReadOnly }}){{ end }}{{ if $val.Destructive }}, Destructive: runtime.BoolPtr({{ $val.Destructive }}){{ end }}{{ if $val.Idempotent }}, Idempotent: runtime.BoolPtr({{ $val.Idempotent }}){{ end }}{{ if $val.OpenWorld }}, OpenWorld: runtime.BoolPtr({{ $val.OpenWorld }}){{ end }}}
 {{- end }}
 )
 
@@ -374,6 +381,7 @@ func ForwardTo{{$key}}Client(s *mcpserver.MCPServer, client {{$key}}Client, opts
     Name:        {{$tool_name}}ToolDef.Name,
     Description: {{$tool_name}}ToolDef.Description,
     RawInputSchema: json.RawMessage({{$tool_name}}ToolDef.JSONSchema),
+    Meta: runtime.ToolMeta({{$tool_name}}ToolDef),
     {{- if $tool_val.Tool.HasToolAnnotations }}
     Annotations: mcp.ToolAnnotation{
       Title:           {{$tool_name}}ToolDef.Title,
@@ -464,6 +472,8 @@ type SimpleTool struct {
 	Name        string
 	Description string
 	JSONSchema  string
+	// OutputSchema describes the JSON of the method response; see runtime.Tool.
+	OutputSchema string
 
 	// Title and the four behavioral hints come from (mcp.options.tool). A nil
 	// hint was not set on the annotation and is omitted from the generated
@@ -589,7 +599,7 @@ func (g *FileGenerator) messageSchemaWithDefs(md protoreflect.MessageDescriptor,
 		}
 
 		// OneOf handling - collect oneOf fields for later processing
-		if oneof := nestedFd.ContainingOneof(); oneof != nil && !oneof.IsSynthetic() {
+		if oneof := nestedFd.ContainingOneof(); oneof != nil && !oneof.IsSynthetic() && !g.outputMode {
 			oneOfName := string(oneof.Name())
 			g.processOneOfField(nestedFd, comment, name, oneOfName, oneOf,
 				func(fd protoreflect.FieldDescriptor, c string) map[string]any {
@@ -598,7 +608,7 @@ func (g *FileGenerator) messageSchemaWithDefs(md protoreflect.MessageDescriptor,
 		} else {
 			// If not part of a oneof, handle as a normal field
 			normalFields[name] = g.getTypeWithDefsAndComment(nestedFd, comment, defs, visiting)
-			if g.isFieldRequiredWithOptionalSupport(nestedFd) {
+			if !g.outputMode && g.isFieldRequiredWithOptionalSupport(nestedFd) {
 				required = append(required, name)
 			}
 		}
@@ -642,7 +652,7 @@ func (g *FileGenerator) messageSchemaWithDefsInternal(md protoreflect.MessageDes
 			comment = fieldComments[name]
 		}
 
-		if oneof := nestedFd.ContainingOneof(); oneof != nil && !oneof.IsSynthetic() {
+		if oneof := nestedFd.ContainingOneof(); oneof != nil && !oneof.IsSynthetic() && !g.outputMode {
 			oneOfName := string(oneof.Name())
 			g.processOneOfField(nestedFd, comment, name, oneOfName, oneOf,
 				func(fd protoreflect.FieldDescriptor, c string) map[string]any {
@@ -650,7 +660,7 @@ func (g *FileGenerator) messageSchemaWithDefsInternal(md protoreflect.MessageDes
 				})
 		} else {
 			normalFields[name] = g.getTypeWithDefsAndComment(nestedFd, comment, defs, visiting)
-			if g.isFieldRequiredWithOptionalSupport(nestedFd) {
+			if !g.outputMode && g.isFieldRequiredWithOptionalSupport(nestedFd) {
 				required = append(required, name)
 			}
 		}
@@ -767,7 +777,7 @@ func (g *FileGenerator) getTypeWithDefsAndComment(fd protoreflect.FieldDescripto
 		schema["description"] = trimmed
 	}
 
-	if isZeroBasedPagination(fd) {
+	if !g.outputMode && isZeroBasedPagination(fd) {
 		schema["minimum"] = 1
 		schema["description"] = adjustDescriptionForOneBased(schema["description"])
 	}
@@ -1003,6 +1013,11 @@ func (g *FileGenerator) getTypeWithDefs(fd protoreflect.FieldDescriptor, defs ma
 		}
 	}
 
+	if g.outputMode && encodesAsJSONString(fd) {
+		schema["type"] = "string"
+		schema["format"] = "int64"
+	}
+
 	// Handle repeated fields here, wrapping the actual schema in an array.
 	if fd.IsList() {
 		return map[string]any{
@@ -1011,6 +1026,27 @@ func (g *FileGenerator) getTypeWithDefs(fd protoreflect.FieldDescriptor, defs ma
 		}
 	}
 	return schema
+}
+
+// encodesAsJSONString reports whether protojson writes the field's 64-bit
+// integer value as a JSON string, which the response schema has to reflect.
+func encodesAsJSONString(fd protoreflect.FieldDescriptor) bool {
+	switch fd.Kind() {
+	case protoreflect.Int64Kind, protoreflect.Sint64Kind, protoreflect.Sfixed64Kind,
+		protoreflect.Uint64Kind, protoreflect.Fixed64Kind:
+		return true
+	case protoreflect.MessageKind:
+		name := fd.Message().FullName()
+		return name == "google.protobuf.Int64Value" || name == "google.protobuf.UInt64Value"
+	}
+	return false
+}
+
+// responseSchemaWithDefs describes the JSON a tool returns for the method's response message.
+func (g *FileGenerator) responseSchemaWithDefs(md protoreflect.MessageDescriptor, protoMsg *protogen.Message) map[string]any {
+	g.outputMode = true
+	defer func() { g.outputMode = false }()
+	return g.messageSchemaWithDefs(md, protoMsg)
 }
 
 // deepCopySchema creates a deep copy of a schema map to avoid mutation of shared schemas
@@ -1403,6 +1439,12 @@ func (g *FileGenerator) GenerateWithConfig(cfg GenerateConfig) {
 				continue
 			}
 
+			outputSchema, err := json.Marshal(g.responseSchemaWithDefs(meth.Output.Desc, meth.Output))
+			if err != nil {
+				g.gen.Error(fmt.Errorf("failed to marshal output JSON schema for %s: %w", meth.Desc.FullName(), err))
+				continue
+			}
+
 			// Resolve the tool name and behavioral hints from (mcp.options.tool).
 			opts := methodToolOptions(meth)
 			name, err := g.resolveToolName(meth, opts)
@@ -1416,6 +1458,7 @@ func (g *FileGenerator) GenerateWithConfig(cfg GenerateConfig) {
 				Name:                     name,
 				Description:              cleanComment(string(meth.Comments.Leading)),
 				JSONSchema:               string(marshaled),
+				OutputSchema:             string(outputSchema),
 				Title:                    opts.GetTitle(),
 				ZeroBasedPaginationPaths: collectZeroBasedPaginationPaths(meth.Input.Desc),
 			}

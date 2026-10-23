@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	OneOfNestedTestService_GrantDeviceDataModificationRightOnApplicationTool = runtime.Tool{Name: "phpt1g_TestService_GrantDeviceDataModificationRightOnApplication", Description: "", JSONSchema: "{\"$defs\":{\"DeviceDataApplications\":{\"properties\":{\"application_code\":{\"type\":\"string\"}},\"required\":[],\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"properties\":{\"kindOneOfType\":{\"oneOf\":[{\"properties\":{\"device_data_applications\":{\"$ref\":\"#/$defs/DeviceDataApplications\",\"type\":\"object\"},\"object_type\":{\"const\":\"device_data_applications\",\"type\":\"string\"}},\"required\":[\"object_type\",\"device_data_applications\"],\"title\":\"device_data_applications\",\"type\":\"object\"}],\"type\":\"object\"}},\"required\":[\"kindOneOfType\"],\"type\":\"object\"}"}
+	OneOfNestedTestService_GrantDeviceDataModificationRightOnApplicationTool = runtime.Tool{Name: "phpt1g_TestService_GrantDeviceDataModificationRightOnApplication", Description: "", JSONSchema: "{\"$defs\":{\"DeviceDataApplications\":{\"properties\":{\"application_code\":{\"type\":\"string\"}},\"required\":[],\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"properties\":{\"kindOneOfType\":{\"oneOf\":[{\"properties\":{\"device_data_applications\":{\"$ref\":\"#/$defs/DeviceDataApplications\",\"type\":\"object\"},\"object_type\":{\"const\":\"device_data_applications\",\"type\":\"string\"}},\"required\":[\"object_type\",\"device_data_applications\"],\"title\":\"device_data_applications\",\"type\":\"object\"}],\"type\":\"object\"}},\"required\":[\"kindOneOfType\"],\"type\":\"object\"}", OutputSchema: "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"properties\":{\"success\":{\"type\":\"boolean\"}},\"required\":[],\"type\":\"object\"}"}
 )
 
 var (
@@ -197,6 +197,7 @@ func ForwardToOneOfNestedTestServiceClient(s *mcpserver.MCPServer, client OneOfN
 		Name:           GrantDeviceDataModificationRightOnApplicationToolDef.Name,
 		Description:    GrantDeviceDataModificationRightOnApplicationToolDef.Description,
 		RawInputSchema: json.RawMessage(GrantDeviceDataModificationRightOnApplicationToolDef.JSONSchema),
+		Meta:           runtime.ToolMeta(GrantDeviceDataModificationRightOnApplicationToolDef),
 	}
 
 	// Add extra properties to schema if configured

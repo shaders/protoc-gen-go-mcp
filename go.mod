@@ -5,7 +5,7 @@ go 1.24.0
 toolchain go1.24.5
 
 require (
-	github.com/mark3labs/mcp-go v0.37.0
+	github.com/mark3labs/mcp-go v0.42.0
 	github.com/onsi/gomega v1.37.0
 	github.com/redpanda-data/common-go/api v0.0.0-20250801174835-9eea07f1ea06
 	github.com/toon-format/toon-go v0.0.0-20251108125615-44b4cd22477f
