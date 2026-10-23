@@ -11,6 +11,9 @@ type Tool struct {
 	Name        string
 	Description string
 	JSONSchema  string
+	// OutputSchema is the JSON schema of the tool result, published under
+	// OutputSchemaMetaKey in the tool's _meta; empty means none.
+	OutputSchema string
 
 	// Title is the human-readable tool title emitted into mcp.ToolAnnotation.
 	// Empty means the method carried no (mcp.options.tool) title.
@@ -25,6 +28,18 @@ type Tool struct {
 	Destructive *bool
 	Idempotent  *bool
 	OpenWorld   *bool
+}
+
+// OutputSchemaMetaKey is the tool _meta key carrying the result schema. It is not
+// the spec's outputSchema, which would oblige every result to repeat itself as structuredContent.
+const OutputSchemaMetaKey = "com.pushwoosh/outputSchema"
+
+// ToolMeta returns the _meta to publish for t, or nil when it has nothing to add.
+func ToolMeta(t Tool) *mcp.Meta {
+	if t.OutputSchema == "" {
+		return nil
+	}
+	return &mcp.Meta{AdditionalFields: map[string]any{OutputSchemaMetaKey: json.RawMessage(t.OutputSchema)}}
 }
 
 // BoolPtr returns a pointer to b. Generated code uses it to emit explicitly

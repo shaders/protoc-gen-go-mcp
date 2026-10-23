@@ -243,6 +243,12 @@ testdatamcp.ForwardToTestServiceClient(mcpServer, client, option)
 ```
 
 
+### Result schema in `_meta`
+
+Every tool also carries the JSON Schema of its result, built from the response message, under the `com.pushwoosh/outputSchema` key of the tool's `_meta` (`runtime.OutputSchemaMetaKey`). It describes the protojson the tool returns: oneof members are plain fields, 64-bit integers are strings, and pages are not shifted to 1-based. A TOON-compressed result carries the same data in another notation.
+
+The schema is deliberately not published as the spec's `outputSchema`: that would oblige every result to repeat itself as `structuredContent`. A client that offloads large results (to a file, a sandbox) can use it to tell the model what it is looking at without putting the schema into the tool list the model reads. `_meta` on tools needs `mark3labs/mcp-go` v0.42.0 or newer.
+
 ## 🧪 Development & Testing
 
 ### Quick Commands
